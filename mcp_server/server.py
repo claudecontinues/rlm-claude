@@ -18,6 +18,7 @@ from mcp.server.fastmcp import FastMCP
 from tools.memory import remember, recall, forget, memory_status
 from tools.navigation import chunk, peek, grep, list_chunks
 from tools.search import search as bm25_search
+from tools.sessions import list_sessions, list_domains
 
 # Initialize the MCP server
 mcp = FastMCP("RLM Server")
@@ -366,6 +367,96 @@ def rlm_list_chunks(limit: int = 20) -> str:
             f"  {c['summary']}\n"
             f"  ~{c['tokens']} tokens | {c['created']}"
         )
+
+    return "".join(output)
+
+
+# =============================================================================
+# SESSION TOOLS (Phase 5.5b)
+# =============================================================================
+
+@mcp.tool()
+def rlm_sessions(
+    project: str = "",
+    domain: str = "",
+    limit: int = 10
+) -> str:
+    """
+    List available sessions, optionally filtered by project or domain.
+
+    Sessions group chunks by working context. Use this to navigate
+    conversation history across different projects or work domains.
+
+    Args:
+        project: Filter by project name (e.g., "RLM", "JoyJuice")
+        domain: Filter by domain (e.g., "bp", "seo", "r&d")
+        limit: Maximum number of sessions to return (default: 10)
+
+    Returns:
+        List of sessions with their metadata
+    """
+    result = list_sessions(
+        project=project if project else None,
+        domain=domain if domain else None,
+        limit=limit
+    )
+
+    if result["total"] == 0:
+        filters = []
+        if project:
+            filters.append(f"project={project}")
+        if domain:
+            filters.append(f"domain={domain}")
+        filter_str = f" (filters: {', '.join(filters)})" if filters else ""
+        return f"No sessions found{filter_str}. Sessions are created when you chunk with project/domain."
+
+    output = [
+        f"Sessions: {result['showing']}/{result['total']}\n"
+        f"Current: {result['current_session'] or 'None'}\n"
+        f"{'=' * 40}"
+    ]
+
+    for s in result["sessions"]:
+        domain_str = f" [{s['domain']}]" if s.get("domain") else ""
+        ticket_str = f" ({s['ticket']})" if s.get("ticket") else ""
+        output.append(
+            f"\n{s['id']}{domain_str}{ticket_str}\n"
+            f"  Project: {s['project']}\n"
+            f"  Chunks: {len(s.get('chunks', []))}\n"
+            f"  Started: {s['started'][:16]}"
+        )
+
+    return "".join(output)
+
+
+@mcp.tool()
+def rlm_domains() -> str:
+    """
+    List available domains from domains.json.
+
+    Domains help categorize chunks by topic/area. This returns the
+    suggested domains, but you can use any domain string you want.
+
+    Returns:
+        List of domains organized by category
+    """
+    result = list_domains()
+
+    output = [
+        f"RLM Domains (v{result['version']})\n"
+        f"{result['description']}\n"
+        f"{'=' * 40}\n"
+        f"Total: {result['total']} domains\n"
+    ]
+
+    for category, info in result["domains"].items():
+        domains_list = ", ".join(info.get("list", []))
+        output.append(
+            f"\n[{category}] {info.get('description', '')}\n"
+            f"  {domains_list}"
+        )
+
+    output.append(f"\n\nNote: You can use any domain, these are just suggestions.")
 
     return "".join(output)
 
