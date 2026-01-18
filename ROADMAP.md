@@ -13,7 +13,7 @@
 | **Phase 2** | VALIDEE | Navigation tools (chunk/peek/grep/list) |
 | **Phase 3** | VALIDEE | Auto-chunking + Skill /rlm-analyze |
 | **Phase 4** | VALIDEE | Production (auto-summary, dedup, access tracking) |
-| **Phase 5** | EN COURS | Avance (BM25, multi-sessions, sub-agents) |
+| **Phase 5** | EN COURS | Avance (BM25, multi-sessions, sub-agents) - 5.5 COMPLETE |
 
 ---
 
@@ -104,41 +104,35 @@ def auto_summarize(content: str, max_tokens: int = 200) -> str:
 | LanceDB | Stockage vectoriel Rust | P3 |
 | Dimensions Matryoshka | 384 dims (tronque de 768) | P3 |
 
-### 5.5 Multi-sessions - EN COURS
+### 5.5 Multi-sessions - COMPLETE
 
 **Objectif** : Organiser les chunks par projet/domaine pour navigation cross-session.
 
 | Sous-phase | Description | Statut |
 |------------|-------------|--------|
 | **5.5a** | Format ID enrichi + detection projet | FAIT |
-| **5.5b** | Sessions tracking + tools | A FAIRE |
-| **5.5c** | Cross-session queries (@syntax) | A FAIRE |
+| **5.5b** | Sessions tracking + tools | FAIT |
+| **5.5c** | Filtres project/domain dans grep/search | FAIT |
 
 **Nouveau format ID** : `{date}_{project}_{seq}[_{ticket}][_{domain}]`
 - Exemple : `2026-01-18_RLM_001_r&d`
 - Exemple : `2026-01-18_JoyJuice_005_TIC-123_bp`
 
-**Phase 5.5a implementee** (2026-01-18) :
+**Implementation complete** (2026-01-18) :
 - `_detect_project()` - Detection auto via env/git/cwd
 - `parse_chunk_id()` - Parser flexible format 1.0 & 2.0
 - `_generate_chunk_id(project, ticket, domain)` - Nouveau format
-- `chunk()` et `rlm_chunk` - Params project/ticket/domain ajoutes
-- `domains.json` - Liste domaines suggeres
+- `sessions.py` - Gestion sessions (list_sessions, list_domains)
+- `rlm_sessions` / `rlm_domains` - Tools MCP
+- `rlm_grep` / `rlm_search` - Filtres project/domain ajoutes
+- `domains.json.example` - Exemple Joy Juice (template)
+- `domains.json` - Auto-genere localement (generique)
 
 **Decisions validees** :
 - Chunks existants restent en format 1.0 (backward compat)
 - Domaines flexibles (pas de validation stricte)
 - Detection auto projet via git root ou cwd
-
-**Prochaine etape (5.5b)** :
-| Tool | Description |
-|------|-------------|
-| `rlm_sessions` | Lister sessions par projet/domaine |
-| `rlm_domains` | Lister domaines suggeres |
-
-**Fichiers a creer** :
-- `sessions.py` - Gestion sessions
-- `sessions.json` - Index des sessions
+- Portabilite : domains.json/sessions.json sont locaux (git-ignored)
 
 ### 5.6 Export et backup
 
