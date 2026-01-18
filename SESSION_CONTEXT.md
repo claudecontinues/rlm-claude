@@ -160,6 +160,10 @@ RLM/
 - Access tracking : Compteur d'acces et `last_accessed` pour chaque chunk
 - Stats usage : `rlm_status()` affiche les chunks les plus accedes
 
+**Bug fix Phase 3** :
+- Hook `Stop` ne supporte PAS les matchers → retirer `"matcher": "*"`
+- Fix applique dans `~/.claude/settings.json` et `templates/hooks_settings.json`
+
 ### Phase 5 (A venir)
 
 Voir [ROADMAP.md](ROADMAP.md) pour les details.
