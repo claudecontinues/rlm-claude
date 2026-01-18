@@ -1,7 +1,7 @@
 # RLM - Contexte de Session
 
 > **Fichier de reprise** : À lire au début de chaque session pour restaurer le contexte complet.
-> **Dernière MAJ** : 2026-01-18
+> **Dernière MAJ** : 2026-01-18 (Phase 2 implémentée)
 
 ---
 
@@ -9,11 +9,33 @@
 
 **Recursive Language Models** - Solution maison inspirée du paper MIT CSAIL (arXiv:2512.24601, Dec 2025) pour résoudre le problème de dégradation de Claude avec les contextes longs (>60% = début des problèmes).
 
+**Problème résolu** :
+- Au-delà de 60% de contexte, Claude devient "lazy et dumb"
+- Régressions dans le code, oubli d'étapes cruciales
+- Besoin de jongler manuellement pour maintenir le contexte bas
+
 **Principe** : Au lieu de charger tout le contexte dans l'attention, on :
 1. Traite le contexte comme un **objet externe navigable**
 2. Utilise des **tools MCP** pour explorer (peek, grep, search)
 3. Permet des **appels récursifs** (sub-agents sur des chunks)
 4. Sauvegarde les **insights clés** en mémoire persistante
+
+---
+
+## ⚠️ CLARIFICATION IMPORTANTE
+
+**Ne pas confondre** :
+
+| Tool natif Claude Code | Tool RLM | Différence |
+|------------------------|----------|------------|
+| `Read` | `rlm_peek` | Read = fichiers du disque / rlm_peek = chunks de conversation |
+| `Grep` | `rlm_grep` | Grep = recherche dans fichiers / rlm_grep = recherche dans historique |
+| N/A | `rlm_chunk` | Sauvegarder l'historique de conversation externalement |
+| N/A | `rlm_remember` | Sauvegarder des insights clés |
+
+**Les tools RLM ne dupliquent pas les tools natifs !**
+- Tools natifs = navigation dans le **code et fichiers projet**
+- Tools RLM = navigation dans l'**historique de conversation** externalisé
 
 ---
 
@@ -24,16 +46,18 @@ RLM/
 ├── mcp_server/           # Serveur MCP Python (FastMCP)
 │   ├── server.py         # Point d'entrée (stdio transport)
 │   └── tools/
-│       └── memory.py     # remember, recall, forget, status
+│       ├── memory.py     # remember, recall, forget, status (Phase 1)
+│       └── navigation.py # chunk, peek, grep, list_chunks (Phase 2)
 │
 ├── context/              # Stockage persistant
-│   ├── session_memory.json   # Insights (ignoré par git)
-│   └── chunks/               # Historique découpé (Phase 2+)
+│   ├── session_memory.json   # Insights clés
+│   ├── index.json            # Index des chunks
+│   └── chunks/               # Historique découpé
+│       └── YYYY-MM-DD_NNN.md
 │
-└── docs/
-    ├── STATE_OF_ART.md           # État de l'art (RLM, Letta, TTT-E2E)
-    ├── IMPLEMENTATION_PROPOSAL.md # Architecture détaillée
-    └── CHECKLIST_PAPER_VS_SOLUTION.md # 85% couverture paper MIT
+├── STATE_OF_ART.md           # État de l'art (RLM, Letta, TTT-E2E)
+├── IMPLEMENTATION_PROPOSAL.md # Architecture détaillée
+└── CHECKLIST_PAPER_VS_SOLUTION.md # 85% couverture paper MIT
 ```
 
 ---
@@ -51,21 +75,21 @@ RLM/
 | GitHub repo créé et poussé | ✅ |
 | **Validation nouvelle session** | ✅ |
 
-**Test validation** : Les 4 tools fonctionnent dans une session Claude Code fraîche. Le fichier SESSION_CONTEXT.md permet une reprise de contexte complète.
-
-**GitHub** : https://github.com/EncrEor/rlm-claude
-
-### Phase 2 : Navigation (PROCHAINE)
+### Phase 2 : Navigation ✅ IMPLÉMENTÉE (2026-01-18)
 
 | Tâche | Statut |
 |-------|--------|
-| Tool `rlm_peek` (voir portion de chunk) | ⏳ |
-| Tool `rlm_grep` (chercher pattern) | ⏳ |
-| Tool `rlm_chunk` (découper contenu) | ⏳ |
-| Index.json avec métadonnées | ⏳ |
-| Tests end-to-end | ⏳ |
+| Tool `rlm_chunk` (sauvegarder contenu) | ✅ Implémenté |
+| Tool `rlm_peek` (voir portion de chunk) | ✅ Implémenté |
+| Tool `rlm_grep` (chercher pattern) | ✅ Implémenté |
+| Tool `rlm_list_chunks` (lister les chunks) | ✅ Implémenté |
+| Index.json v2.0.0 avec métadonnées | ✅ |
+| Tests fonctions Python | ✅ |
+| **Tests MCP end-to-end** | ⏳ Relancer Claude Code |
 
-### Phase 3 : Sub-agents
+**Note** : Les fonctions Python sont validées. Pour tester via MCP, il faut relancer Claude Code pour charger les nouveaux tools.
+
+### Phase 3 : Sub-agents (PROCHAINE)
 
 - Tool `rlm_sub_query`
 - Hooks auto-chunking
@@ -88,16 +112,29 @@ RLM/
 
 ## 4. Tools MCP Disponibles
 
-| Tool | Description | Phase |
-|------|-------------|-------|
-| `rlm_remember` | Sauvegarder un insight | 1 ✅ |
-| `rlm_recall` | Récupérer des insights | 1 ✅ |
-| `rlm_forget` | Supprimer un insight | 1 ✅ |
-| `rlm_status` | Stats du système mémoire | 1 ✅ |
-| `rlm_peek` | Voir portion de chunk | 2 ⏳ |
-| `rlm_grep` | Chercher un pattern | 2 ⏳ |
-| `rlm_chunk` | Découper du contenu | 2 ⏳ |
-| `rlm_sub_query` | Lancer sub-agent | 3 ⏳ |
+### Phase 1 - Memory (insights)
+
+| Tool | Description | Statut |
+|------|-------------|--------|
+| `rlm_remember` | Sauvegarder un insight (décision, fait, préférence) | ✅ |
+| `rlm_recall` | Récupérer des insights par query/catégorie | ✅ |
+| `rlm_forget` | Supprimer un insight | ✅ |
+| `rlm_status` | Stats du système mémoire | ✅ |
+
+### Phase 2 - Navigation (chunks)
+
+| Tool | Description | Statut |
+|------|-------------|--------|
+| `rlm_chunk` | Sauvegarder du contenu en chunk externe | ✅ |
+| `rlm_peek` | Lire un chunk (ou portion) | ✅ |
+| `rlm_grep` | Chercher un pattern dans les chunks | ✅ |
+| `rlm_list_chunks` | Lister les chunks disponibles | ✅ |
+
+### Phase 3+ (à venir)
+
+| Tool | Description | Statut |
+|------|-------------|--------|
+| `rlm_sub_query` | Lancer sub-agent sur chunk | ⏳ |
 
 ---
 
@@ -105,9 +142,11 @@ RLM/
 
 | Question | Décision | Justification |
 |----------|----------|---------------|
-| Taille chunks | 2000 tokens + 200 overlap | Balance contexte/performance |
+| Format chunks | Markdown (.md) | Lisible, facile à éditer |
+| ID chunks | `YYYY-MM-DD_NNN` | Chronologique, unique |
+| Taille max chunk | 3000 tokens | Balance contexte/granularité |
 | Transport MCP | stdio | Compatible Claude Code natif |
-| Stockage | Fichiers JSON | Simple, portable, versionnable |
+| Stockage | Fichiers JSON/MD | Simple, portable, versionnable |
 | Sub-model | Haiku pour sub-queries | Économie tokens (à implémenter) |
 | n8n pour hooks | Non (v1) | Scripts locaux suffisent |
 
@@ -117,11 +156,12 @@ RLM/
 
 | Fichier | Description |
 |---------|-------------|
-| `mcp_server/server.py` | Serveur MCP principal |
-| `mcp_server/tools/memory.py` | Fonctions remember/recall |
-| `context/session_memory.json` | Données mémoire (runtime) |
-| `STATE_OF_ART.md` | Recherche complète |
-| `IMPLEMENTATION_PROPOSAL.md` | Architecture détaillée |
+| `mcp_server/server.py` | Serveur MCP principal (8 tools) |
+| `mcp_server/tools/memory.py` | Fonctions Phase 1 |
+| `mcp_server/tools/navigation.py` | Fonctions Phase 2 |
+| `context/session_memory.json` | Insights stockés |
+| `context/index.json` | Index des chunks |
+| `context/chunks/*.md` | Chunks de conversation |
 
 ---
 
@@ -134,6 +174,12 @@ claude mcp list
 # Voir les insights stockés
 cat /Users/amx/Documents/Joy_Claude/RLM/context/session_memory.json
 
+# Voir les chunks
+cat /Users/amx/Documents/Joy_Claude/RLM/context/index.json
+
+# Lister les chunks
+ls -la /Users/amx/Documents/Joy_Claude/RLM/context/chunks/
+
 # Git status
 cd /Users/amx/Documents/Joy_Claude/RLM && git status
 
@@ -145,12 +191,38 @@ cd /Users/amx/Documents/Joy_Claude/RLM && git add . && git commit -m "message" &
 
 ## 8. Prochaine Action
 
-**Tester les tools Phase 1** dans cette nouvelle session :
-1. Utiliser `rlm_remember` pour sauvegarder un insight
-2. Utiliser `rlm_recall` pour le récupérer
-3. Utiliser `rlm_status` pour voir les stats
+**Tester les tools Phase 2** après avoir relancé Claude Code :
 
-Si tout fonctionne → passer à Phase 2.
+```
+1. rlm_list_chunks()
+   → Doit montrer le chunk de test créé
+
+2. rlm_chunk("Nouveau contenu...", summary="Description", tags="tag1,tag2")
+   → Doit créer un nouveau chunk
+
+3. rlm_peek("2026-01-18_001")
+   → Doit afficher le contenu
+
+4. rlm_grep("RLM")
+   → Doit trouver des matches
+
+5. rlm_status()
+   → Doit montrer insights + chunks
+```
+
+Si tout fonctionne → Phase 3 (sub-agents).
+
+---
+
+## 9. Cas d'Usage Concrets Joy Juice
+
+| Situation | Tool RLM | Exemple |
+|-----------|----------|---------|
+| "On a parlé de quoi il y a 2h ?" | `rlm_list_chunks` | Voir l'historique externalisé |
+| "Où on a discuté des scénarios ?" | `rlm_grep("scénario")` | Trouver les discussions |
+| "Cette discussion est importante" | `rlm_chunk(...)` | Sauvegarder pour plus tard |
+| "Rappelle-moi la décision sur X" | `rlm_recall("X")` | Retrouver un insight |
+| "On a décidé que..." | `rlm_remember(...)` | Sauvegarder la décision |
 
 ---
 

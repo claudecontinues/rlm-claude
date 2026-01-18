@@ -20,8 +20,8 @@ env/
 .DS_Store
 Thumbs.db
 
-# Project specific
-context/chunks/
+# Project specific - runtime data (not tracked)
+context/chunks/*.md
 context/session_memory.json
 context/index.json
 logs/
