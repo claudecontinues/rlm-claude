@@ -296,10 +296,11 @@ RLM/
 │           └── skill.md       # Skill analyse parallele
 │
 ├── context/                   # Stockage (cree a l'install)
-│   ├── session_memory.json    # Insights stockes
-│   ├── index.json             # Index des chunks (v2.1.0)
-│   ├── sessions.json          # Index des sessions (Phase 5.5)
-│   ├── domains.json           # Domaines suggeres (Phase 5.5)
+│   ├── session_memory.json    # Insights stockes (local, git-ignored)
+│   ├── index.json             # Index des chunks (local, git-ignored)
+│   ├── sessions.json          # Index des sessions (local, git-ignored)
+│   ├── domains.json           # Domaines suggeres (local, auto-genere)
+│   ├── domains.json.example   # Exemple avec domaines Joy Juice
 │   └── chunks/                # Historique decoupe
 │
 ├── install.sh                 # Script installation
@@ -315,6 +316,36 @@ RLM/
 ---
 
 ## Configuration
+
+### Personnalisation des Domaines
+
+Les domaines sont des suggestions pour organiser vos chunks par theme.
+Un fichier `domains.json` generique est cree automatiquement au premier lancement.
+
+Pour personnaliser :
+
+```bash
+# Voir l'exemple complet (Joy Juice)
+cat context/domains.json.example
+
+# Editer votre fichier local
+nano context/domains.json
+```
+
+Structure du fichier :
+
+```json
+{
+  "domains": {
+    "mon_projet": {
+      "description": "Domaines pour mon projet",
+      "list": ["feature", "bugfix", "infra", "docs"]
+    }
+  }
+}
+```
+
+Note : Vous pouvez utiliser n'importe quel domaine, meme s'il n'est pas dans la liste.
 
 ### Seuils Auto-Chunking
 

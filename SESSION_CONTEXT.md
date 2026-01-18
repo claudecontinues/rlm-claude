@@ -82,8 +82,9 @@ RLM/
 ├── context/              # Stockage persistant
 │   ├── session_memory.json   # Insights cles
 │   ├── index.json            # Index des chunks (v2.1.0)
-│   ├── sessions.json         # Index des sessions (Phase 5.5)
-│   ├── domains.json          # Domaines suggeres (Phase 5.5)
+│   ├── sessions.json         # Index des sessions (local, auto-cree)
+│   ├── domains.json          # Domaines suggeres (local, auto-cree)
+│   ├── domains.json.example  # Exemple Joy Juice (tracke par git)
 │   └── chunks/               # Historique decoupe
 │       └── {date}_{project}_{seq}[_{ticket}][_{domain}].md
 │
@@ -203,7 +204,8 @@ Letta benchmark : filesystem + grep = 74% accuracy > Mem0 avec embeddings (68.5%
 - `parse_chunk_id()` - Parser flexible format 1.0 & 2.0
 - `_generate_chunk_id(project, ticket, domain)` - Nouveau format
 - `chunk()` et `rlm_chunk` - Params project/ticket/domain ajoutes
-- `domains.json` - Liste domaines suggeres (31 domaines)
+- `domains.json` - Auto-cree avec domaines generiques (13 par defaut)
+- `domains.json.example` - Exemple complet Joy Juice (31 domaines)
 - Nouveau format ID : `{date}_{project}_{seq}[_{ticket}][_{domain}]`
 
 **5.5b - Session Tracking** :
