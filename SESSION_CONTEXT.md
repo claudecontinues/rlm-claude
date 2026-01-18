@@ -173,7 +173,51 @@ rlm_peek("chunk_id")               → access_count incremente ✅
 rlm_status()                       → "Most accessed" affiche ✅
 ```
 
-### Phase 5 (A venir)
+### Phase 5 : RLM Authentique - EN COURS (2026-01-18)
+
+**Changement strategique** : Suite a recherche approfondie, Phase 5 redesignee pour suivre le paper MIT.
+
+**Decouverte cle** : Le paper RLM MIT n'utilise PAS d'embeddings. C'est delibere.
+Letta benchmark : filesystem + grep = 74% accuracy > Mem0 avec embeddings (68.5%).
+
+| Sous-phase | Description | Statut |
+|------------|-------------|--------|
+| **5.1 BM25S** | Ranking par pertinence (500x plus rapide) | FAIT |
+| **5.2 Grep++** | Fuzzy matching + scoring | A FAIRE |
+| **5.3 Sub-agents** | Analyse parallele (Partition + Map) | A FAIRE |
+| **5.4 Embeddings** | BACKUP seulement si BM25 < 70% | OPTIONNEL |
+| **5.5 Multi-sessions** | Format enrichi + cross-session | A FAIRE |
+| **5.6 Retention** | LRU-Soft + immunite auto | A FAIRE |
+
+**Phase 5.1 implementee** (2026-01-18) :
+- `mcp_server/tools/tokenizer_fr.py` - Tokenization FR/EN zero dependance
+- `mcp_server/tools/search.py` - BM25S search avec scoring
+- `mcp_server/server.py` - Tool `rlm_search` ajoute
+- Tests valides : tokenizer + search fonctionnent correctement
+
+**Decisions validees (Session 2026-01-18 apres-midi)** :
+
+1. **Multi-sessions** : Format `{date}_{project}_{seq}_{ticket}_{domain}`
+   - Ticket optionnel (Trello, GitHub...)
+   - Domaines : 23 valeurs (listes Trello + labels + custom)
+     - Listes : finance, legal, operations, commercial, marketing, rh, r&d
+     - Themes : admin, qualite, expertise, performance, visibilite, notoriete, ventes, fidelisation, scaling, deck
+     - Custom : website, seo, blog, erp, bp, bi
+   - Syntaxe cross-session : `@2026-01-17_RLM_001:003`
+
+2. **Retention** : 3 zones (Actif → Archive .gz → Purge)
+   - Archive apres 30j si access_count == 0
+   - Purge apres 180j en archive
+   - Immunite auto : tags critical/decision, access >= 3, ticket ouvert
+
+3. **Tokenization** : Zero dependance (regex + stopwords FR/EN)
+   - Normalisation accents (`realiste` = `réaliste`)
+   - Split mots composes (`jus-de-fruits` → `[jus, fruits]`)
+
+4. **Dataset test** : V1 (10 queries) puis V2 (+25 chunks synthetiques)
+   - Seuil : P@1 >= 70% sinon activer embeddings
+
+**Documentation complete** : `docs/PHASE5_PLAN.md`
 
 Voir [ROADMAP.md](ROADMAP.md) pour les details.
 
@@ -198,6 +242,12 @@ Voir [ROADMAP.md](ROADMAP.md) pour les details.
 | `rlm_peek` | Lire un chunk (ou portion) | OK |
 | `rlm_grep` | Chercher un pattern dans les chunks | OK |
 | `rlm_list_chunks` | Lister les chunks disponibles | OK |
+
+### Phase 5 - Search (BM25)
+
+| Tool | Description | Statut |
+|------|-------------|--------|
+| `rlm_search` | Recherche BM25 par pertinence (FR/EN) | OK |
 
 ### Phase 3 - Auto-chunking
 

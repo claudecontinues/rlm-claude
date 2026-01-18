@@ -57,49 +57,67 @@ def auto_summarize(content: str, max_tokens: int = 200) -> str:
 
 ---
 
-## Phase 5 : Avance
+## Phase 5 : RLM Authentique
 
-**Objectif** : Fonctionnalites avancees pour power users.
+**Objectif** : Suivre le paper MIT avec BM25 + sub-agents, embeddings en backup.
 
-### 5.1 Recherche semantique (Embeddings)
+**Changement strategique (2026-01-18)** : Apres recherche approfondie, on decouvre que le paper RLM MIT n'utilise PAS d'embeddings. Letta benchmark confirme : filesystem + grep = 74% accuracy > embeddings.
 
-| Tache | Description | Priorite |
-|-------|-------------|----------|
-| Embeddings locaux | Utiliser sentence-transformers localement | P1 |
-| Index vectoriel | FAISS ou ChromaDB pour recherche | P1 |
-| Tool `rlm_search` | Recherche semantique vs grep exact | P1 |
-
-**Avantage** : Trouver des chunks conceptuellement similaires meme sans mot-cle exact.
-
-**Implementation proposee** :
-```python
-# Nouveau fichier: tools/semantic.py
-from sentence_transformers import SentenceTransformer
-
-model = SentenceTransformer('all-MiniLM-L6-v2')
-
-def semantic_search(query: str, top_k: int = 5) -> list:
-    """Search chunks by semantic similarity."""
-    query_embedding = model.encode(query)
-    # Compare avec embeddings pre-calcules des chunks
-    pass
-```
-
-### 5.2 Multi-sessions
+### 5.1 BM25 Ranking
 
 | Tache | Description | Priorite |
 |-------|-------------|----------|
-| Session ID | Identifier les sessions distinctes | P1 |
+| Tool `rlm_search` | Recherche BM25S (500x plus rapide) | P1 |
+| Tokenization FR/EN | Stopwords, normalisation | P1 |
+| Scoring pertinence | Trier par score BM25 | P1 |
+
+**Implementation** : BM25S (Scipy sparse matrices, pas rank_bm25)
+
+### 5.2 Grep Optimise
+
+| Tache | Description | Priorite |
+|-------|-------------|----------|
+| Fuzzy matching | Tolerance typos (thefuzz) | P1 |
+| Multi-pattern | Chercher plusieurs termes | P2 |
+| Scoring | Trier resultats grep par pertinence | P2 |
+
+### 5.3 Sub-agents Paralleles
+
+| Tache | Description | Priorite |
+|-------|-------------|----------|
+| Partition + Map | Analyser N chunks en parallele | P1 |
+| Skill `/rlm-parallel` | Interface utilisateur | P1 |
+| Merger intelligent | Synthetiser les reponses | P1 |
+
+**Architecture** : Task tools paralleles (natif Claude Code)
+
+### 5.4 Embeddings (BACKUP)
+
+**Activer SEULEMENT SI** : BM25 < 70% precision ou queries semantiques pures echouent.
+
+| Tache | Description | Priorite |
+|-------|-------------|----------|
+| Nomic Embed v2 MoE | Modele multilingue leger | P3 |
+| LanceDB | Stockage vectoriel Rust | P3 |
+| Dimensions Matryoshka | 384 dims (tronque de 768) | P3 |
+
+### 5.5 Multi-sessions (a definir)
+
+| Tache | Description | Priorite |
+|-------|-------------|----------|
+| Session ID | Identifier les sessions distinctes | P2 |
 | Historique cross-session | Acceder aux chunks d'autres sessions | P2 |
-| Merge sessions | Combiner des sessions reliees | P3 |
+| Definition "session" | Par jour / projet / contexte ? | P2 |
 
-### 5.3 Export et backup
+### 5.6 Export et backup
 
 | Tache | Description | Priorite |
 |-------|-------------|----------|
-| Export JSON | Exporter toute la memoire en JSON | P2 |
-| Backup automatique | Sauvegarder periodiquement | P2 |
-| Import | Restaurer depuis backup | P2 |
+| Export JSON | Exporter toute la memoire en JSON | P3 |
+| Backup automatique | Sauvegarder periodiquement | P3 |
+| Import | Restaurer depuis backup | P3 |
+
+**Documentation complete** : `docs/PHASE5_PLAN.md`
 
 ---
 

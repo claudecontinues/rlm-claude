@@ -17,6 +17,7 @@ Usage:
 from mcp.server.fastmcp import FastMCP
 from tools.memory import remember, recall, forget, memory_status
 from tools.navigation import chunk, peek, grep, list_chunks
+from tools.search import search as bm25_search
 
 # Initialize the MCP server
 mcp = FastMCP("RLM Server")
@@ -276,6 +277,42 @@ def rlm_grep(
             f"{i}. [{match['chunk_id']}] line {match['line_number']}\n"
             f"   Summary: {match['chunk_summary']}\n"
             f"   Context: {match['context'][:200]}{'...' if len(match['context']) > 200 else ''}"
+        )
+
+    return "\n\n".join(output)
+
+
+@mcp.tool()
+def rlm_search(query: str, limit: int = 5) -> str:
+    """
+    Search chunks using BM25 ranking (Phase 5.1).
+
+    More effective than grep for natural language queries.
+    Returns chunks ranked by relevance score.
+
+    Uses French/English tokenization with accent normalization.
+
+    Args:
+        query: Natural language search query (e.g., "business plan discussion")
+        limit: Maximum results (default: 5)
+
+    Returns:
+        Ranked list of matching chunks with scores
+    """
+    result = bm25_search(query, limit)
+
+    if result["status"] == "error":
+        return f"Error: {result['message']}"
+
+    if result["result_count"] == 0:
+        return f"No matching chunks found for: {query}"
+
+    output = [f"Top {result['result_count']} results for '{query}':\n"]
+
+    for i, r in enumerate(result["results"], 1):
+        output.append(
+            f"{i}. [{r['chunk_id']}] score: {r['score']:.2f}\n"
+            f"   {r['summary'][:80]}{'...' if len(r['summary']) > 80 else ''}"
         )
 
     return "\n\n".join(output)

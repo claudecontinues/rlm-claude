@@ -132,6 +132,12 @@ cp templates/skills/rlm-analyze/skill.md ~/.claude/skills/rlm-analyze/
 | `rlm_grep` | Chercher un pattern regex dans tous les chunks |
 | `rlm_list_chunks` | Lister les chunks disponibles avec metadonnees |
 
+### Phase 5 - Search (BM25)
+
+| Tool | Description |
+|------|-------------|
+| `rlm_search` | Recherche BM25 par pertinence (FR/EN, accents normalises) |
+
 ---
 
 ## Skill /rlm-analyze
@@ -195,8 +201,13 @@ rlm_list_chunks()
 # Lire un chunk specifique (incremente access_count)
 rlm_peek("2026-01-18_001")
 
-# Chercher dans l'historique
+# Chercher dans l'historique (regex)
 rlm_grep("business plan")
+
+# Recherche BM25 par pertinence (Phase 5)
+rlm_search("discussion sur le business plan")
+# → Retourne les chunks tries par score de pertinence
+# → Supporte FR/EN, normalise les accents (realiste = réaliste)
 ```
 
 ### Voir l'etat du systeme
@@ -239,10 +250,12 @@ rlm_status()
 ```
 RLM/
 ├── mcp_server/
-│   ├── server.py              # Serveur MCP (8 tools)
+│   ├── server.py              # Serveur MCP (9 tools)
 │   └── tools/
 │       ├── memory.py          # Phase 1 (insights)
-│       └── navigation.py      # Phase 2 (chunks)
+│       ├── navigation.py      # Phase 2 (chunks)
+│       ├── tokenizer_fr.py    # Phase 5 (tokenization FR/EN)
+│       └── search.py          # Phase 5 (BM25 search)
 │
 ├── hooks/                     # Phase 3 (auto-chunking)
 │   ├── auto_chunk_check.py    # Hook Stop - detection
@@ -347,7 +360,12 @@ ls ~/.claude/skills/rlm-analyze/
 - [x] **Phase 2** : Navigation tools (chunk/peek/grep/list)
 - [x] **Phase 3** : Auto-chunking + Skill /rlm-analyze
 - [x] **Phase 4** : Production (auto-summary, dedup, access tracking)
-- [ ] **Phase 5** : Avance (embeddings, multi-sessions)
+- [ ] **Phase 5** : Avance
+  - [x] 5.1 : BM25 search (rlm_search)
+  - [ ] 5.2 : Fuzzy grep
+  - [ ] 5.3 : Sub-agents paralleles
+  - [ ] 5.5 : Multi-sessions
+  - [ ] 5.6 : Retention (archive/purge)
 
 Voir [ROADMAP.md](ROADMAP.md) pour les details.
 
@@ -386,4 +404,4 @@ MIT License - voir [LICENSE](LICENSE)
 
 ---
 
-**Derniere mise a jour** : 2026-01-18 (Phase 4 validee)
+**Derniere mise a jour** : 2026-01-18 (Phase 5.1 - BM25 search)
