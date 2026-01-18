@@ -4,10 +4,10 @@
 # Memoire infinie pour Claude Code
 # =============================================================================
 #
-# Usage: ./install.sh
-#
-# Installation 100% automatique - aucune etape manuelle requise.
-# Installe les hooks, le skill, et configure le serveur MCP.
+# Usage:
+#   ./install.sh                    # Auto-detect CLAUDE.md
+#   ./install.sh --claude-md PATH   # Specify CLAUDE.md path
+#   ./install.sh --no-claude-md     # Skip CLAUDE.md modification
 #
 # =============================================================================
 
@@ -19,12 +19,81 @@ echo "  RLM - Memoire infinie pour Claude Code"
 echo "=============================================="
 echo ""
 
+# =============================================================================
+# Parse arguments
+# =============================================================================
+CLAUDE_MD_PATH=""
+SKIP_CLAUDE_MD=false
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --claude-md)
+            CLAUDE_MD_PATH="$2"
+            shift 2
+            ;;
+        --no-claude-md)
+            SKIP_CLAUDE_MD=true
+            shift
+            ;;
+        *)
+            echo "Option inconnue: $1"
+            echo "Usage: ./install.sh [--claude-md PATH] [--no-claude-md]"
+            exit 1
+            ;;
+    esac
+done
+
+# =============================================================================
 # Paths
+# =============================================================================
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 RLM_DIR="$HOME/.claude/rlm"
 SKILLS_DIR="$HOME/.claude/skills"
 SETTINGS_FILE="$HOME/.claude/settings.json"
-CLAUDE_MD="$HOME/.claude/CLAUDE.md"
+
+# =============================================================================
+# Function: Find CLAUDE.md
+# =============================================================================
+find_claude_md() {
+    local found_files=()
+
+    # Check common locations
+    local locations=(
+        "$SCRIPT_DIR/../CLAUDE.md"           # Parent of RLM directory
+        "$SCRIPT_DIR/../../CLAUDE.md"        # Two levels up
+        "$HOME/.claude/CLAUDE.md"            # User's .claude directory
+        "$(pwd)/CLAUDE.md"                   # Current directory
+        "$SCRIPT_DIR/CLAUDE.md"              # Same directory as script
+    )
+
+    for loc in "${locations[@]}"; do
+        if [ -f "$loc" ]; then
+            # Resolve to absolute path
+            local abs_path="$(cd "$(dirname "$loc")" && pwd)/$(basename "$loc")"
+            # Avoid duplicates
+            local is_dup=false
+            for f in "${found_files[@]}"; do
+                if [ "$f" = "$abs_path" ]; then
+                    is_dup=true
+                    break
+                fi
+            done
+            if [ "$is_dup" = false ]; then
+                found_files+=("$abs_path")
+            fi
+        fi
+    done
+
+    # Return results
+    if [ ${#found_files[@]} -eq 0 ]; then
+        echo ""
+    elif [ ${#found_files[@]} -eq 1 ]; then
+        echo "${found_files[0]}"
+    else
+        # Multiple found - list them
+        echo "MULTIPLE:${found_files[*]}"
+    fi
+}
 
 # =============================================================================
 # 1. Create directories
@@ -103,7 +172,6 @@ echo "  OK - Contexte initialise"
 # =============================================================================
 echo "[6/7] Configuration des hooks dans settings.json..."
 
-# Python script to merge hooks
 python3 << 'PYTHON_SCRIPT'
 import json
 from pathlib import Path
@@ -147,14 +215,12 @@ for hook_type, hook_configs in rlm_hooks.items():
     if hook_type not in settings["hooks"]:
         settings["hooks"][hook_type] = []
 
-    # Get existing commands for this hook type
     existing_cmds = []
     for existing in settings["hooks"][hook_type]:
         for h in existing.get("hooks", []):
             if h.get("command"):
                 existing_cmds.append(h["command"])
 
-    # Add new hooks if not duplicate
     for config in hook_configs:
         for h in config.get("hooks", []):
             cmd = h.get("command", "")
@@ -175,18 +241,71 @@ PYTHON_SCRIPT
 # =============================================================================
 echo "[7/7] Configuration CLAUDE.md..."
 
-RLM_MARKER="## RLM - MEMOIRE AUTOMATIQUE"
-if [ -f "$CLAUDE_MD" ]; then
-    if ! grep -q "$RLM_MARKER" "$CLAUDE_MD" 2>/dev/null; then
-        echo "" >> "$CLAUDE_MD"
-        cat "$SCRIPT_DIR/templates/CLAUDE_RLM_SNIPPET.md" >> "$CLAUDE_MD"
-        echo "  OK - Instructions RLM ajoutees a CLAUDE.md"
-    else
-        echo "  OK - Instructions RLM deja presentes"
-    fi
+if [ "$SKIP_CLAUDE_MD" = true ]; then
+    echo "  SKIP - Option --no-claude-md"
 else
-    cat "$SCRIPT_DIR/templates/CLAUDE_RLM_SNIPPET.md" > "$CLAUDE_MD"
-    echo "  OK - CLAUDE.md cree avec instructions RLM"
+    # If path not provided, try to find it
+    if [ -z "$CLAUDE_MD_PATH" ]; then
+        FOUND=$(find_claude_md)
+
+        if [ -z "$FOUND" ]; then
+            echo ""
+            echo "  CLAUDE.md non trouve automatiquement."
+            echo "  Emplacements verifies:"
+            echo "    - $SCRIPT_DIR/../CLAUDE.md"
+            echo "    - $HOME/.claude/CLAUDE.md"
+            echo "    - $(pwd)/CLAUDE.md"
+            echo ""
+            read -p "  Entrez le chemin vers CLAUDE.md (ou 'skip' pour ignorer): " CLAUDE_MD_PATH
+            if [ "$CLAUDE_MD_PATH" = "skip" ] || [ -z "$CLAUDE_MD_PATH" ]; then
+                echo "  SKIP - CLAUDE.md ignore"
+                CLAUDE_MD_PATH=""
+            fi
+        elif [[ "$FOUND" == MULTIPLE:* ]]; then
+            # Multiple files found
+            FILES="${FOUND#MULTIPLE:}"
+            echo ""
+            echo "  Plusieurs CLAUDE.md trouves:"
+            IFS=' ' read -ra FILE_ARRAY <<< "$FILES"
+            i=1
+            for f in "${FILE_ARRAY[@]}"; do
+                echo "    [$i] $f"
+                ((i++))
+            done
+            echo ""
+            read -p "  Choisissez un numero (ou 'skip' pour ignorer): " CHOICE
+            if [ "$CHOICE" = "skip" ] || [ -z "$CHOICE" ]; then
+                echo "  SKIP - CLAUDE.md ignore"
+                CLAUDE_MD_PATH=""
+            else
+                # Get the chosen file
+                idx=$((CHOICE - 1))
+                CLAUDE_MD_PATH="${FILE_ARRAY[$idx]}"
+            fi
+        else
+            # Single file found
+            CLAUDE_MD_PATH="$FOUND"
+            echo "  Trouve: $CLAUDE_MD_PATH"
+        fi
+    fi
+
+    # Add RLM snippet if path is set
+    if [ -n "$CLAUDE_MD_PATH" ] && [ -f "$CLAUDE_MD_PATH" ]; then
+        RLM_MARKER="## RLM - MEMOIRE AUTOMATIQUE"
+        if ! grep -q "$RLM_MARKER" "$CLAUDE_MD_PATH" 2>/dev/null; then
+            # Backup first
+            cp "$CLAUDE_MD_PATH" "$CLAUDE_MD_PATH.backup.$(date +%Y%m%d_%H%M%S)"
+            # Append
+            echo "" >> "$CLAUDE_MD_PATH"
+            cat "$SCRIPT_DIR/templates/CLAUDE_RLM_SNIPPET.md" >> "$CLAUDE_MD_PATH"
+            echo "  OK - Instructions RLM ajoutees a $CLAUDE_MD_PATH"
+            echo "  (Backup cree: $CLAUDE_MD_PATH.backup.*)"
+        else
+            echo "  OK - Instructions RLM deja presentes dans $CLAUDE_MD_PATH"
+        fi
+    elif [ -n "$CLAUDE_MD_PATH" ]; then
+        echo "  ERREUR - Fichier non trouve: $CLAUDE_MD_PATH"
+    fi
 fi
 
 # =============================================================================
