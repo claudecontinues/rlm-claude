@@ -23,6 +23,7 @@ Thumbs.db
 # Project specific
 context/chunks/
 context/session_memory.json
+context/index.json
 logs/
 *.log
 

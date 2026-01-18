@@ -1,0 +1,4 @@
+# This directory stores RLM context data
+# session_memory.json - Insights and facts
+# index.json - Chunk metadata
+# chunks/ - Chunked conversation history
