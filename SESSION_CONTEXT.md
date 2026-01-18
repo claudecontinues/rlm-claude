@@ -184,7 +184,7 @@ Letta benchmark : filesystem + grep = 74% accuracy > Mem0 avec embeddings (68.5%
 |------------|-------------|--------|
 | **5.1 BM25S** | Ranking par pertinence (500x plus rapide) | FAIT |
 | **5.2 Grep++** | Fuzzy matching + scoring | A FAIRE |
-| **5.3 Sub-agents** | Analyse parallele (Partition + Map) | EN COURS |
+| **5.3 Sub-agents** | Analyse parallele (Partition + Map) | FAIT |
 | **5.4 Embeddings** | BACKUP seulement si BM25 < 70% | OPTIONNEL |
 | **5.5 Multi-sessions** | Format enrichi + cross-session | A FAIRE |
 | **5.6 Retention** | LRU-Soft + immunite auto | A FAIRE |
@@ -333,20 +333,12 @@ cd /Users/amx/Documents/Joy_Claude/RLM && git add . && git commit -m "message" &
 
 ## 8. Prochaine Action
 
-**Phase 5.3 : Sub-agents** - EN COURS
+**Phase 5.3 : Sub-agents** - FAIT (2026-01-18)
 
-Fait :
-- Skill `/rlm-parallel` cree
-- `install.sh` mis a jour
-
-A faire :
-- Tester le skill manuellement
-- Installer via copie manuelle ou `./install.sh`
-- Valider les 3 tests du plan
-- Commit + push GitHub
+Commit : `02e6bce` - feat(phase5.3): Add /rlm-parallel skill
 
 **Prochaines phases** :
-- **5.2 Grep++** : Fuzzy matching + scoring
+- **5.2 Grep++** : Fuzzy matching + scoring (thefuzz)
 - **5.5 Multi-sessions** : Format enrichi + cross-session
 - **5.6 Retention** : LRU-Soft + immunite auto
 

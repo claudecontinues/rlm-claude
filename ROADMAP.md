@@ -81,15 +81,16 @@ def auto_summarize(content: str, max_tokens: int = 200) -> str:
 | Multi-pattern | Chercher plusieurs termes | P2 |
 | Scoring | Trier resultats grep par pertinence | P2 |
 
-### 5.3 Sub-agents Paralleles
+### 5.3 Sub-agents Paralleles - FAIT
 
-| Tache | Description | Priorite |
-|-------|-------------|----------|
-| Partition + Map | Analyser N chunks en parallele | P1 |
-| Skill `/rlm-parallel` | Interface utilisateur | P1 |
-| Merger intelligent | Synthetiser les reponses | P1 |
+| Tache | Description | Statut |
+|-------|-------------|--------|
+| Partition + Map | Analyser 3 chunks en parallele | FAIT |
+| Skill `/rlm-parallel` | Pattern auto-applique par Claude | FAIT |
+| Merger intelligent | Synthetiser avec citations [chunk_id] | FAIT |
 
-**Architecture** : Task tools paralleles (natif Claude Code)
+**Implementation** : Task tools paralleles (natif Claude Code, $0)
+**Note** : MCP Sampling non supporte par Claude Code (issue #1785) → Skill = seule option
 
 ### 5.4 Embeddings (BACKUP)
 
@@ -123,22 +124,12 @@ def auto_summarize(content: str, max_tokens: int = 200) -> str:
 
 ## Pistes R&D (non planifiees)
 
-### Option : API Haiku direct
+### Option : API Haiku direct (OBSOLETE)
 
-Si un jour on veut plus d'automatisation, on pourrait :
-1. Stocker une cle API Anthropic dans `RLM/config.json`
-2. Appeler Claude Haiku directement depuis le MCP server
-3. Cout estime : ~$5/mois pour usage intensif
+**Cette option n'est plus necessaire.**
 
-**Avantages** :
-- Resumes de qualite superieure
-- Sub-queries plus intelligentes
-- Verification automatique
-
-**Inconvenients** :
-- Necessite cle API ($)
-- Plus de latence
-- Dependance externe
+Les Task tools de Claude Code sont inclus dans l'abonnement Pro/Max = **$0 supplementaire**.
+Le skill `/rlm-parallel` utilise ce mecanisme natif.
 
 ### Support MCP Sampling
 

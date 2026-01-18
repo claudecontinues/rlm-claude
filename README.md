@@ -140,26 +140,22 @@ cp templates/skills/rlm-analyze/skill.md ~/.claude/skills/rlm-analyze/
 
 ---
 
-## Skill /rlm-analyze
+## Skills RLM
 
-Analyser un chunk avec un sub-agent dedie (contexte isole 200k tokens).
+Claude utilise ces patterns automatiquement quand pertinent (aucune action humaine requise).
 
-```
-/rlm-analyze <chunk_id> "<question>"
-```
+### /rlm-analyze
 
-### Exemples
+Analyser un chunk avec un sub-agent dedie (contexte isole).
 
-```
-/rlm-analyze 2026-01-18_001 "Quelle decision a ete prise ?"
-/rlm-analyze 2026-01-17_003 "Resume les points cles"
-```
+### /rlm-parallel
 
-### Quand l'utiliser
+Analyser plusieurs chunks en parallele et fusionner les resultats.
+Pattern "Partition + Map" du paper MIT RLM.
 
-- Apres avoir trouve un chunk pertinent via `rlm_grep`
-- Pour analyser un ancien historique sans le charger en contexte
-- Quand le contexte actuel est > 50%
+- 3 analyses paralleles (Task tools Sonnet)
+- 1 merger qui synthetise avec citations [chunk_id]
+- Detection automatique des contradictions
 
 ---
 
@@ -265,8 +261,10 @@ RLM/
 │   ├── hooks_settings.json    # Config hooks a copier
 │   ├── CLAUDE_RLM_SNIPPET.md  # Instructions CLAUDE.md
 │   └── skills/
-│       └── rlm-analyze/
-│           └── skill.md       # Skill /rlm-analyze
+│       ├── rlm-analyze/
+│       │   └── skill.md       # Skill analyse 1 chunk
+│       └── rlm-parallel/
+│           └── skill.md       # Skill analyse parallele
 │
 ├── context/                   # Stockage (cree a l'install)
 │   ├── session_memory.json    # Insights stockes
@@ -363,7 +361,7 @@ ls ~/.claude/skills/rlm-analyze/
 - [ ] **Phase 5** : Avance
   - [x] 5.1 : BM25 search (rlm_search)
   - [ ] 5.2 : Fuzzy grep
-  - [ ] 5.3 : Sub-agents paralleles
+  - [x] 5.3 : Sub-agents paralleles (/rlm-parallel)
   - [ ] 5.5 : Multi-sessions
   - [ ] 5.6 : Retention (archive/purge)
 
@@ -404,4 +402,4 @@ MIT License - voir [LICENSE](LICENSE)
 
 ---
 
-**Derniere mise a jour** : 2026-01-18 (Phase 5.1 - BM25 search)
+**Derniere mise a jour** : 2026-01-18 (Phase 5.3 - Sub-agents paralleles)
