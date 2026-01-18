@@ -177,7 +177,10 @@ def rlm_status() -> str:
 def rlm_chunk(
     content: str,
     summary: str = "",
-    tags: str = ""
+    tags: str = "",
+    project: str = "",
+    ticket: str = "",
+    domain: str = ""
 ) -> str:
     """
     Save content to an external chunk file for later retrieval.
@@ -191,16 +194,30 @@ def rlm_chunk(
     - Auto-generates summary if not provided
     - Detects duplicate content and returns existing chunk ID
 
+    Phase 5.5 enhancements:
+    - Supports project/ticket/domain for multi-session organization
+    - New chunk ID format: {date}_{project}_{seq}[_{ticket}][_{domain}]
+
     Args:
         content: The text content to save as a chunk (conversation history, notes, etc.)
         summary: Brief description of what this chunk contains (auto-generated if empty)
         tags: Comma-separated keywords for easier retrieval (e.g., "bp,scenario,2026")
+        project: Project name (auto-detected from git if empty)
+        ticket: Optional ticket reference (e.g., "JJ-123", "GH-456")
+        domain: Optional domain (e.g., "bp", "seo", "r&d", "website")
 
     Returns:
         Confirmation with chunk ID and token estimate
     """
     tags_list = [t.strip() for t in tags.split(",") if t.strip()] if tags else []
-    result = chunk(content, summary, tags_list)
+    result = chunk(
+        content=content,
+        summary=summary,
+        tags=tags_list,
+        project=project if project else None,
+        ticket=ticket if ticket else None,
+        domain=domain if domain else None
+    )
 
     # Phase 4.2: Handle duplicate detection
     if result["status"] == "duplicate":

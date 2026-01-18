@@ -18,7 +18,9 @@ Phase 4 additions:
 
 import hashlib
 import json
+import os
 import re
+import subprocess
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -28,6 +30,98 @@ from typing import Optional
 CONTEXT_DIR = Path(__file__).parent.parent.parent / "context"
 CHUNKS_DIR = CONTEXT_DIR / "chunks"
 INDEX_FILE = CONTEXT_DIR / "index.json"
+
+
+# =============================================================================
+# PHASE 5.5: Multi-sessions support
+# =============================================================================
+
+def _detect_project() -> str:
+    """
+    Auto-detect project name from environment or git (Phase 5.5).
+
+    Priority:
+    1. RLM_PROJECT environment variable (explicit override)
+    2. Git repository name (most reliable)
+    3. Current working directory name (fallback)
+
+    Returns:
+        Project name string
+    """
+    # 1. Environment variable (explicit)
+    if project := os.getenv("RLM_PROJECT"):
+        return project
+
+    # 2. Git repository name
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        if result.returncode == 0:
+            return Path(result.stdout.strip()).name
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        pass
+
+    # 3. Fallback to current directory
+    return Path.cwd().name
+
+
+def parse_chunk_id(chunk_id: str) -> dict:
+    """
+    Parse chunk ID into components (Phase 5.5).
+
+    Handles both format 1.0 (legacy) and 2.0 (multi-session).
+
+    Format 1.0: {date}_{seq} (e.g., "2026-01-18_001")
+    Format 2.0: {date}_{project}_{seq}[_{ticket}][_{domain}]
+
+    Args:
+        chunk_id: The chunk ID to parse
+
+    Returns:
+        Dictionary with parsed components:
+        - date, sequence, project, ticket, domain, format
+    """
+    parts = chunk_id.split("_")
+
+    if len(parts) == 2:
+        # Format 1.0: 2026-01-18_001
+        return {
+            "date": parts[0],
+            "sequence": parts[1],
+            "project": None,
+            "ticket": None,
+            "domain": None,
+            "format": "1.0"
+        }
+
+    elif len(parts) >= 3:
+        # Format 2.0: 2026-01-18_RLM_001[_ticket][_domain]
+        result = {
+            "date": parts[0],
+            "project": parts[1],
+            "sequence": parts[2],
+            "ticket": None,
+            "domain": None,
+            "format": "2.0"
+        }
+
+        # Parse optional parts (ticket or domain)
+        for part in parts[3:]:
+            # Tickets start with common prefixes
+            if any(part.upper().startswith(p) for p in ["TIC-", "ISSUE-", "#", "JJ-", "GH-"]):
+                result["ticket"] = part
+            else:
+                # Assume it's a domain
+                result["domain"] = part
+
+        return result
+
+    # Unknown format
+    return {"raw": chunk_id, "format": "unknown"}
 
 
 def _load_index() -> dict:
@@ -162,25 +256,57 @@ def _increment_access(chunk_id: str) -> None:
     _save_index(index)
 
 
-def _generate_chunk_id() -> str:
-    """Generate a unique chunk ID based on date and sequence."""
+def _generate_chunk_id(
+    project: str = None,
+    ticket: str = None,
+    domain: str = None
+) -> str:
+    """
+    Generate a unique chunk ID (Phase 5.5 enhanced).
+
+    Format 2.0: {date}_{project}_{seq}[_{ticket}][_{domain}]
+
+    Args:
+        project: Project name (auto-detected if None)
+        ticket: Optional ticket reference (e.g., "JJ-123")
+        domain: Optional domain (e.g., "bp", "seo")
+
+    Returns:
+        Unique chunk ID string
+    """
     today = datetime.now().strftime("%Y-%m-%d")
     index = _load_index()
 
-    # Find existing chunks for today
+    # Auto-detect project if not provided
+    if project is None:
+        project = _detect_project()
+
+    # Find existing chunks for today + project
     existing_today = [
         c for c in index["chunks"]
-        if c["id"].startswith(today)
+        if c["id"].startswith(today) and c.get("project") == project
     ]
 
     sequence = len(existing_today) + 1
-    return f"{today}_{sequence:03d}"
+
+    # Build ID parts
+    parts = [today, project, f"{sequence:03d}"]
+
+    if ticket:
+        parts.append(ticket)
+    if domain:
+        parts.append(domain)
+
+    return "_".join(parts)
 
 
 def chunk(
     content: str,
     summary: str = "",
-    tags: Optional[list[str]] = None
+    tags: Optional[list[str]] = None,
+    project: str = None,
+    ticket: str = None,
+    domain: str = None
 ) -> dict:
     """
     Save content to an external chunk file.
@@ -193,10 +319,17 @@ def chunk(
     - Detects duplicate content via hash
     - Stores content hash for future duplicate checks
 
+    Phase 5.5 enhancements:
+    - Supports project/ticket/domain for multi-session organization
+    - New chunk ID format: {date}_{project}_{seq}[_{ticket}][_{domain}]
+
     Args:
         content: The text content to save as a chunk
         summary: Brief description of what this chunk contains (auto-generated if empty)
         tags: Keywords for easier retrieval
+        project: Project name (auto-detected if None)
+        ticket: Optional ticket reference (e.g., "JJ-123")
+        domain: Optional domain (e.g., "bp", "seo", "r&d")
 
     Returns:
         Dictionary with chunk_id and confirmation, or duplicate status
@@ -219,18 +352,26 @@ def chunk(
     if not summary:
         summary = _auto_summarize(content)
 
-    chunk_id = _generate_chunk_id()
+    # Phase 5.5: Generate ID with project/ticket/domain
+    chunk_id = _generate_chunk_id(project=project, ticket=ticket, domain=domain)
     chunk_file = CHUNKS_DIR / f"{chunk_id}.md"
     tokens = _estimate_tokens(content)
+
+    # Resolve project for metadata (in case it was auto-detected)
+    resolved_project = project if project else _detect_project()
 
     # Create chunk file with metadata header
     header = f"""---
 id: {chunk_id}
 summary: {summary}
 tags: {', '.join(tags or [])}
+project: {resolved_project}
+ticket: {ticket or ''}
+domain: {domain or ''}
 created_at: {datetime.now().isoformat()}
 tokens_estimate: {tokens}
 content_hash: {content_hash}
+format_version: "2.0"
 ---
 
 """
@@ -249,7 +390,12 @@ content_hash: {content_hash}
         "content_hash": content_hash,
         "access_count": 0,
         "last_accessed": None,
-        "created_at": datetime.now().isoformat()
+        "created_at": datetime.now().isoformat(),
+        # Phase 5.5 fields
+        "project": resolved_project,
+        "ticket": ticket,
+        "domain": domain,
+        "format_version": "2.0"
     })
     index["total_tokens_estimate"] = sum(c["tokens_estimate"] for c in index["chunks"])
     _save_index(index)
