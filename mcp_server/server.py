@@ -268,7 +268,9 @@ def rlm_peek(
 @mcp.tool()
 def rlm_grep(
     pattern: str,
-    limit: int = 10
+    limit: int = 10,
+    project: str = "",
+    domain: str = ""
 ) -> str:
     """
     Search for a pattern across all saved chunks.
@@ -276,17 +278,32 @@ def rlm_grep(
     Use this to find where a topic was discussed or where specific
     information is stored in your conversation history.
 
+    Phase 5.5c: Supports filtering by project and domain.
+
     Args:
         pattern: Text or regex pattern to search for (case-insensitive)
         limit: Maximum number of matches to return (default: 10)
+        project: Filter by project name (e.g., "RLM", "JoyJuice")
+        domain: Filter by domain (e.g., "bp", "seo", "r&d")
 
     Returns:
         List of matches with chunk IDs and context
     """
-    result = grep(pattern, limit)
+    result = grep(
+        pattern,
+        limit,
+        project=project if project else None,
+        domain=domain if domain else None
+    )
 
     if result["match_count"] == 0:
-        return f"No matches found for pattern: {pattern}"
+        filters = []
+        if project:
+            filters.append(f"project={project}")
+        if domain:
+            filters.append(f"domain={domain}")
+        filter_str = f" (filters: {', '.join(filters)})" if filters else ""
+        return f"No matches found for pattern: {pattern}{filter_str}"
 
     output = [f"Found {result['match_count']} match(es) for '{pattern}':\n"]
 
@@ -301,7 +318,12 @@ def rlm_grep(
 
 
 @mcp.tool()
-def rlm_search(query: str, limit: int = 5) -> str:
+def rlm_search(
+    query: str,
+    limit: int = 5,
+    project: str = "",
+    domain: str = ""
+) -> str:
     """
     Search chunks using BM25 ranking (Phase 5.1).
 
@@ -310,14 +332,23 @@ def rlm_search(query: str, limit: int = 5) -> str:
 
     Uses French/English tokenization with accent normalization.
 
+    Phase 5.5c: Supports filtering by project and domain.
+
     Args:
         query: Natural language search query (e.g., "business plan discussion")
         limit: Maximum results (default: 5)
+        project: Filter by project name (e.g., "RLM", "JoyJuice")
+        domain: Filter by domain (e.g., "bp", "seo", "r&d")
 
     Returns:
         Ranked list of matching chunks with scores
     """
-    result = bm25_search(query, limit)
+    result = bm25_search(
+        query,
+        limit,
+        project=project if project else None,
+        domain=domain if domain else None
+    )
 
     if result["status"] == "error":
         return f"Error: {result['message']}"

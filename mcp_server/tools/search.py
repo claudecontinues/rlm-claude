@@ -7,8 +7,10 @@ MIT RLM paper approach (no embeddings, keyword-based ranking).
 Uses BM25S library (500x faster than rank_bm25) for efficient scoring.
 
 Phase 5.1 implementation.
+Phase 5.5c: Added project/domain filtering.
 """
 
+import json
 import re
 from pathlib import Path
 from typing import Optional
@@ -184,13 +186,22 @@ class RLMSearch:
         return output
 
 
-def search(query: str, limit: int = 5) -> dict:
+def search(
+    query: str,
+    limit: int = 5,
+    project: str = None,
+    domain: str = None
+) -> dict:
     """
     Convenience function for searching chunks.
+
+    Phase 5.5c: Supports filtering by project and domain.
 
     Args:
         query: Natural language search query
         limit: Maximum results (default: 5)
+        project: Filter by project name (Phase 5.5c)
+        domain: Filter by domain (Phase 5.5c)
 
     Returns:
         Dictionary with search results
@@ -198,7 +209,8 @@ def search(query: str, limit: int = 5) -> dict:
     searcher = RLMSearch()
 
     try:
-        results = searcher.search(query, top_k=limit)
+        # Get more results than needed for filtering
+        results = searcher.search(query, top_k=limit * 3)
     except ImportError as e:
         return {
             "status": "error",
@@ -206,10 +218,35 @@ def search(query: str, limit: int = 5) -> dict:
             "results": []
         }
 
+    # Phase 5.5c: Filter by project/domain if specified
+    if project or domain:
+        # Load index to get chunk metadata
+        index_file = CONTEXT_DIR / "index.json"
+        if index_file.exists():
+            with open(index_file, "r", encoding="utf-8") as f:
+                index = json.load(f)
+
+            # Build lookup for project/domain
+            chunk_meta = {c["id"]: c for c in index.get("chunks", [])}
+
+            filtered = []
+            for r in results:
+                meta = chunk_meta.get(r["chunk_id"], {})
+                if project and meta.get("project") != project:
+                    continue
+                if domain and meta.get("domain") != domain:
+                    continue
+                filtered.append(r)
+            results = filtered
+
+    # Apply final limit
+    results = results[:limit]
+
     return {
         "status": "success",
         "query": query,
         "result_count": len(results),
+        "filters": {"project": project, "domain": domain} if (project or domain) else None,
         "results": results
     }
 

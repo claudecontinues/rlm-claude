@@ -192,22 +192,32 @@ Letta benchmark : filesystem + grep = 74% accuracy > Mem0 avec embeddings (68.5%
 | **5.3 Sub-agents** | Analyse parallele (Partition + Map) | FAIT |
 | **5.4 Embeddings** | BACKUP seulement si BM25 < 70% | OPTIONNEL |
 | **5.5a Multi-sessions Fondation** | Format enrichi + detection projet | FAIT |
-| **5.5b Multi-sessions Tracking** | sessions.py + tools | A FAIRE |
-| **5.5c Multi-sessions Cross-session** | @syntax + filtres | A FAIRE |
+| **5.5b Multi-sessions Tracking** | sessions.py + tools | FAIT |
+| **5.5c Multi-sessions Cross-session** | Filtres project/domain dans grep/search | FAIT |
 | **5.6 Retention** | LRU-Soft + immunite auto | A FAIRE |
 
-**Phase 5.5a COMPLETE** (2026-01-18) :
+**Phase 5.5 COMPLETE** (2026-01-18) :
+
+**5.5a - Fondation** :
 - `_detect_project()` - Detection auto via env/git/cwd
 - `parse_chunk_id()` - Parser flexible format 1.0 & 2.0
 - `_generate_chunk_id(project, ticket, domain)` - Nouveau format
 - `chunk()` et `rlm_chunk` - Params project/ticket/domain ajoutes
-- `domains.json` - Liste domaines suggeres
+- `domains.json` - Liste domaines suggeres (31 domaines)
 - Nouveau format ID : `{date}_{project}_{seq}[_{ticket}][_{domain}]`
 
-**Prochaine etape (5.5b)** :
-- Sessions tracking via `sessions.json`
-- Nouveaux tools : `rlm_sessions`, `rlm_domains`
-- Syntaxe cross-session : `@session_id:chunk`
+**5.5b - Session Tracking** :
+- `sessions.py` - Gestion sessions (list_sessions, list_domains, register, add_chunk)
+- `sessions.json` - Index des sessions
+- `rlm_sessions` - Tool MCP pour lister/filtrer sessions
+- `rlm_domains` - Tool MCP pour lister domaines disponibles
+
+**5.5c - Cross-session Queries** :
+- `rlm_grep(pattern, project=, domain=)` - Filtrage par projet/domaine
+- `rlm_search(query, project=, domain=)` - Filtrage par projet/domaine
+- Note : Syntaxe `@session:chunk` non implementee (IDs uniques suffisent)
+
+**Prochaine etape** : Phase 5.6 Retention (LRU-Soft + immunite auto)
 
 **Phase 5.1 implementee** (2026-01-18) :
 - `mcp_server/tools/tokenizer_fr.py` - Tokenization FR/EN zero dependance
@@ -275,14 +285,16 @@ Voir [ROADMAP.md](ROADMAP.md) pour les details.
 
 | Tool | Description | Statut |
 |------|-------------|--------|
-| `rlm_search` | Recherche BM25 par pertinence (FR/EN) | OK |
+| `rlm_search` | Recherche BM25 par pertinence (FR/EN) + filtres project/domain | OK |
 
-### Phase 5.5 - Multi-sessions (EN COURS)
+### Phase 5.5 - Multi-sessions
 
 | Tool | Description | Statut |
 |------|-------------|--------|
-| `rlm_sessions` | Lister sessions par projet/domaine | A VENIR |
-| `rlm_domains` | Lister domaines disponibles | A VENIR |
+| `rlm_sessions` | Lister sessions par projet/domaine | OK |
+| `rlm_domains` | Lister domaines disponibles (31) | OK |
+| `rlm_grep` | + filtres `project=`, `domain=` | OK |
+| `rlm_search` | + filtres `project=`, `domain=` | OK |
 
 ### Phase 3 - Auto-chunking & Skills
 

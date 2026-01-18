@@ -475,7 +475,9 @@ def peek(
 def grep(
     pattern: str,
     limit: int = 10,
-    context_lines: int = 1
+    context_lines: int = 1,
+    project: str = None,
+    domain: str = None
 ) -> dict:
     """
     Search for a pattern across all chunks.
@@ -483,10 +485,14 @@ def grep(
     Use this to find where a topic was discussed or where
     specific information is stored.
 
+    Phase 5.5c: Supports filtering by project and domain.
+
     Args:
         pattern: Text or regex pattern to search for
         limit: Maximum number of matches to return
         context_lines: Number of lines before/after match to include
+        project: Filter by project name (Phase 5.5c)
+        domain: Filter by domain (Phase 5.5c)
 
     Returns:
         Dictionary with list of matches
@@ -501,6 +507,11 @@ def grep(
         regex = re.compile(re.escape(pattern), re.IGNORECASE)
 
     for chunk_info in index.get("chunks", []):
+        # Phase 5.5c: Apply project/domain filters
+        if project and chunk_info.get("project") != project:
+            continue
+        if domain and chunk_info.get("domain") != domain:
+            continue
         chunk_file = CONTEXT_DIR / chunk_info["file"]
 
         if not chunk_file.exists():

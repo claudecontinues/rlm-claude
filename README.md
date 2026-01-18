@@ -138,16 +138,19 @@ cp templates/skills/rlm-analyze/skill.md ~/.claude/skills/rlm-analyze/
 |------|-------------|
 | `rlm_search` | Recherche BM25 par pertinence (FR/EN, accents normalises) |
 
-### Phase 5.5 - Multi-sessions (EN COURS)
+### Phase 5.5 - Multi-sessions
 
 | Tool | Description |
 |------|-------------|
 | `rlm_sessions` | Lister sessions par projet/domaine |
-| `rlm_domains` | Lister domaines suggeres |
+| `rlm_domains` | Lister domaines suggeres (31 domaines) |
+| `rlm_grep` | + params `project=`, `domain=` pour filtrer |
+| `rlm_search` | + params `project=`, `domain=` pour filtrer |
 
 **Nouveau format chunk ID** : `{date}_{project}_{seq}[_{ticket}][_{domain}]`
 - Exemple : `2026-01-18_RLM_001_r&d`
-- Backward compat : chunks existants restent accessibles
+- Auto-detection du projet via git ou cwd
+- Backward compat : chunks existants (format 1.0) restent accessibles
 
 ---
 
@@ -211,10 +214,24 @@ rlm_peek("2026-01-18_001")
 # Chercher dans l'historique (regex)
 rlm_grep("business plan")
 
+# Phase 5.5c: Filtrer par projet/domaine
+rlm_grep("equipment", project="JoyJuice", domain="bp")
+
 # Recherche BM25 par pertinence (Phase 5)
 rlm_search("discussion sur le business plan")
 # → Retourne les chunks tries par score de pertinence
 # → Supporte FR/EN, normalise les accents (realiste = réaliste)
+
+# Phase 5.5c: Filtrer les recherches
+rlm_search("scenarios", project="JoyJuice")
+
+# Lister les sessions disponibles
+rlm_sessions()                          # Toutes
+rlm_sessions(project="RLM")             # Par projet
+rlm_sessions(domain="bp")               # Par domaine
+
+# Voir les domaines disponibles
+rlm_domains()  # → 31 domaines (23 Joy Juice + 8 default)
 ```
 
 ### Voir l'etat du systeme
@@ -376,7 +393,7 @@ ls ~/.claude/skills/rlm-analyze/
   - [x] 5.1 : BM25 search (rlm_search)
   - [ ] 5.2 : Fuzzy grep
   - [x] 5.3 : Sub-agents paralleles (/rlm-parallel)
-  - [ ] **5.5 : Multi-sessions (EN COURS)**
+  - [x] **5.5 : Multi-sessions** (sessions, domains, filtres project/domain)
   - [ ] 5.6 : Retention (archive/purge)
 
 Voir [ROADMAP.md](ROADMAP.md) pour les details.
@@ -416,4 +433,4 @@ MIT License - voir [LICENSE](LICENSE)
 
 ---
 
-**Derniere mise a jour** : 2026-01-18 (Phase 5.5 - Multi-sessions en cours)
+**Derniere mise a jour** : 2026-01-18 (Phase 5.5 Multi-sessions COMPLETE)
