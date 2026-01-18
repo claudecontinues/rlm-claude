@@ -213,6 +213,7 @@ Letta benchmark : filesystem + grep = 74% accuracy > Mem0 avec embeddings (68.5%
 - `sessions.json` - Index des sessions
 - `rlm_sessions` - Tool MCP pour lister/filtrer sessions
 - `rlm_domains` - Tool MCP pour lister domaines disponibles
+- **Bugfix 5.5b** : `chunk()` appelle maintenant `register_session()` et `add_chunk_to_session()`
 
 **5.5c - Cross-session Queries** :
 - `rlm_grep(pattern, project=, domain=)` - Filtrage par projet/domaine

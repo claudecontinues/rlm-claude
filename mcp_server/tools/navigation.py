@@ -25,6 +25,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
+# Phase 5.5: Session tracking
+from .sessions import register_session, add_chunk_to_session
+
 
 # Paths
 CONTEXT_DIR = Path(__file__).parent.parent.parent / "context"
@@ -399,6 +402,22 @@ format_version: "2.0"
     })
     index["total_tokens_estimate"] = sum(c["tokens_estimate"] for c in index["chunks"])
     _save_index(index)
+
+    # Phase 5.5: Register session and link chunk
+    if resolved_project:
+        # Create or get session for this project/domain combo
+        session_id = f"{datetime.now().strftime('%Y-%m-%d')}_{resolved_project}"
+        if domain:
+            session_id += f"_{domain}"
+
+        register_session(
+            session_id=session_id,
+            project=resolved_project,
+            path=str(Path.cwd()),
+            domain=domain or "",
+            ticket=ticket or ""
+        )
+        add_chunk_to_session(chunk_id, session_id)
 
     return {
         "status": "created",
