@@ -2,7 +2,7 @@
 
 > **Document de planification R&D** - A valider avant implementation
 > **Auteurs** : Ahmed + Claude (session 2026-01-18)
-> **Statut** : IMPLEMENTATION EN COURS - Phase 5.5
+> **Statut** : IMPLEMENTATION EN COURS - Phase 5.5b
 
 ---
 
@@ -14,8 +14,18 @@
 | **5.2** | Grep Optimise | A FAIRE |
 | **5.3** | Sub-agents Paralleles | FAIT |
 | **5.4** | Embeddings (backup) | OPTIONNEL |
-| **5.5** | Multi-sessions | EN COURS |
+| **5.5a** | Multi-sessions Fondation | FAIT |
+| **5.5b** | Multi-sessions Tracking | A FAIRE |
+| **5.5c** | Multi-sessions Cross-session | A FAIRE |
 | **5.6** | Retention | A FAIRE |
+
+### Phase 5.5a implémentée (2026-01-18)
+
+- `_detect_project()` - Détection auto via env/git/cwd
+- `parse_chunk_id()` - Parser flexible format 1.0 & 2.0
+- `_generate_chunk_id(project, ticket, domain)` - Nouveau format
+- `chunk()` et `rlm_chunk` - Params project/ticket/domain ajoutés
+- `domains.json` - Liste domaines suggérés
 
 ---
 

@@ -191,15 +191,23 @@ Letta benchmark : filesystem + grep = 74% accuracy > Mem0 avec embeddings (68.5%
 | **5.2 Grep++** | Fuzzy matching + scoring | A FAIRE |
 | **5.3 Sub-agents** | Analyse parallele (Partition + Map) | FAIT |
 | **5.4 Embeddings** | BACKUP seulement si BM25 < 70% | OPTIONNEL |
-| **5.5 Multi-sessions** | Format enrichi + cross-session | EN COURS |
+| **5.5a Multi-sessions Fondation** | Format enrichi + detection projet | FAIT |
+| **5.5b Multi-sessions Tracking** | sessions.py + tools | A FAIRE |
+| **5.5c Multi-sessions Cross-session** | @syntax + filtres | A FAIRE |
 | **5.6 Retention** | LRU-Soft + immunite auto | A FAIRE |
 
-**Phase 5.5 en cours** (2026-01-18) :
+**Phase 5.5a COMPLETE** (2026-01-18) :
+- `_detect_project()` - Detection auto via env/git/cwd
+- `parse_chunk_id()` - Parser flexible format 1.0 & 2.0
+- `_generate_chunk_id(project, ticket, domain)` - Nouveau format
+- `chunk()` et `rlm_chunk` - Params project/ticket/domain ajoutes
+- `domains.json` - Liste domaines suggeres
 - Nouveau format ID : `{date}_{project}_{seq}[_{ticket}][_{domain}]`
+
+**Prochaine etape (5.5b)** :
 - Sessions tracking via `sessions.json`
 - Nouveaux tools : `rlm_sessions`, `rlm_domains`
 - Syntaxe cross-session : `@session_id:chunk`
-- Domaines flexibles (pas de validation stricte)
 
 **Phase 5.1 implementee** (2026-01-18) :
 - `mcp_server/tools/tokenizer_fr.py` - Tokenization FR/EN zero dependance

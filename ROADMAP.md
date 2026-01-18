@@ -110,7 +110,7 @@ def auto_summarize(content: str, max_tokens: int = 200) -> str:
 
 | Sous-phase | Description | Statut |
 |------------|-------------|--------|
-| **5.5a** | Format ID enrichi + detection projet | EN COURS |
+| **5.5a** | Format ID enrichi + detection projet | FAIT |
 | **5.5b** | Sessions tracking + tools | A FAIRE |
 | **5.5c** | Cross-session queries (@syntax) | A FAIRE |
 
@@ -118,12 +118,19 @@ def auto_summarize(content: str, max_tokens: int = 200) -> str:
 - Exemple : `2026-01-18_RLM_001_r&d`
 - Exemple : `2026-01-18_JoyJuice_005_TIC-123_bp`
 
+**Phase 5.5a implementee** (2026-01-18) :
+- `_detect_project()` - Detection auto via env/git/cwd
+- `parse_chunk_id()` - Parser flexible format 1.0 & 2.0
+- `_generate_chunk_id(project, ticket, domain)` - Nouveau format
+- `chunk()` et `rlm_chunk` - Params project/ticket/domain ajoutes
+- `domains.json` - Liste domaines suggeres
+
 **Decisions validees** :
 - Chunks existants restent en format 1.0 (backward compat)
 - Domaines flexibles (pas de validation stricte)
 - Detection auto projet via git root ou cwd
 
-**Nouveaux tools** :
+**Prochaine etape (5.5b)** :
 | Tool | Description |
 |------|-------------|
 | `rlm_sessions` | Lister sessions par projet/domaine |
@@ -132,7 +139,6 @@ def auto_summarize(content: str, max_tokens: int = 200) -> str:
 **Fichiers a creer** :
 - `sessions.py` - Gestion sessions
 - `sessions.json` - Index des sessions
-- `domains.json` - Domaines suggeres
 
 ### 5.6 Export et backup
 
