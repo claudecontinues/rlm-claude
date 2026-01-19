@@ -93,9 +93,10 @@ cp templates/skills/rlm-analyze/skill.md ~/.claude/skills/rlm-analyze/
 |    - Peut utiliser /rlm-analyze pour analyser d'anciens chunks   |
 |                              |                                     |
 |                              v                                     |
-|  MCP SERVER RLM (8 tools)                                         |
+|  MCP SERVER RLM (14 tools)                                        |
 |    - rlm_remember/recall/forget/status (insights)                |
-|    - rlm_chunk/peek/grep/list_chunks (navigation)                |
+|    - rlm_chunk/peek/grep/list_chunks + search/sessions (nav)     |
+|    - rlm_retention_preview/run/restore (retention)               |
 |    - Stockage persistant dans ~/.claude/rlm/context/             |
 |                                                                    |
 +-------------------------------------------------------------------+
@@ -152,6 +153,20 @@ cp templates/skills/rlm-analyze/skill.md ~/.claude/skills/rlm-analyze/
 - Exemple : `2026-01-18_RLM_001_r&d`
 - Auto-detection du projet via git ou cwd
 - Backward compat : chunks existants (format 1.0) restent accessibles
+
+### Phase 5.6 - Retention (v0.7.0)
+
+| Tool | Description |
+|------|-------------|
+| `rlm_retention_preview` | **NEW** Preview des actions archive/purge (dry-run) |
+| `rlm_retention_run` | **NEW** Executer archivage et/ou purge |
+| `rlm_restore` | **NEW** Restaurer un chunk archive |
+
+**Architecture 3 zones** : ACTIF → ARCHIVE (.gz) → PURGE
+- Archive apres 30 jours si `access_count == 0` et non-immune
+- Purge apres 180 jours en archive
+- Immunite : tags `critical`/`decision`, `access_count >= 3`, keywords `DECISION:`/`IMPORTANT:`
+- Auto-restore : `peek()` restaure automatiquement les chunks archives
 
 ---
 
@@ -280,13 +295,14 @@ rlm_status()
 ```
 RLM/
 ├── mcp_server/
-│   ├── server.py              # Serveur MCP (11 tools)
+│   ├── server.py              # Serveur MCP (14 tools)
 │   └── tools/
 │       ├── memory.py          # Phase 1 (insights)
-│       ├── navigation.py      # Phase 2 + 5.5 (chunks)
+│       ├── navigation.py      # Phase 2 + 5.5 (chunks + auto-restore)
 │       ├── tokenizer_fr.py    # Phase 5.1 (tokenization FR/EN)
 │       ├── search.py          # Phase 5.1 (BM25 search)
-│       └── sessions.py        # Phase 5.5 (sessions, domains)
+│       ├── sessions.py        # Phase 5.5 (sessions, domains)
+│       └── retention.py       # Phase 5.6 (archive/restore/purge)
 │
 ├── hooks/                     # Phase 3 (auto-chunking)
 │   ├── auto_chunk_check.py    # Hook Stop - detection
@@ -307,7 +323,10 @@ RLM/
 │   ├── sessions.json          # Index des sessions (local, git-ignored)
 │   ├── domains.json           # Domaines suggeres (local, auto-genere)
 │   ├── domains.json.example   # Exemple avec domaines Joy Juice
-│   └── chunks/                # Historique decoupe
+│   ├── chunks/                # Historique decoupe
+│   ├── archive/               # Chunks archives .gz (Phase 5.6)
+│   ├── archive_index.json     # Index des archives (Phase 5.6)
+│   └── purge_log.json         # Log des purges (Phase 5.6)
 │
 ├── install.sh                 # Script installation
 ├── README.md                  # Cette documentation
@@ -426,12 +445,12 @@ ls ~/.claude/skills/rlm-analyze/
 - [x] **Phase 2** : Navigation tools (chunk/peek/grep/list)
 - [x] **Phase 3** : Auto-chunking + Skill /rlm-analyze
 - [x] **Phase 4** : Production (auto-summary, dedup, access tracking)
-- [ ] **Phase 5** : Avance
+- [x] **Phase 5** : Avance
   - [x] 5.1 : BM25 search (rlm_search)
-  - [x] **5.2 : Fuzzy grep** (v0.6.1 - tolere typos)
+  - [x] 5.2 : Fuzzy grep (v0.6.1 - tolere typos)
   - [x] 5.3 : Sub-agents paralleles (/rlm-parallel)
   - [x] 5.5 : Multi-sessions (sessions, domains, filtres project/domain)
-  - [ ] 5.6 : Retention (archive/purge)
+  - [x] **5.6 : Retention** (v0.7.0 - archive/purge)
 - [ ] **Phase 6** : Production-Ready (tests, CI/CD, PyPI)
 
 Voir [ROADMAP.md](ROADMAP.md) pour les details.
@@ -471,4 +490,4 @@ MIT License - voir [LICENSE](LICENSE)
 
 ---
 
-**Derniere mise a jour** : 2026-01-19 (Phase 5.2 Fuzzy Grep - v0.6.1)
+**Derniere mise a jour** : 2026-01-19 (Phase 5.6 Retention - v0.7.0)

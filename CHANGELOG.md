@@ -9,7 +9,52 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Planned
 - Phase 6: Production-Ready (tests, CI/CD, PyPI distribution)
-- Phase 5.6: Retention (LRU-Soft + auto-immunity)
+
+---
+
+## [0.7.0] - 2026-01-19 - Phase 5.6 Retention
+
+### Added
+- `rlm_retention_preview` tool - Preview what would be archived/purged (dry-run)
+- `rlm_retention_run` tool - Execute archiving and/or purging
+- `rlm_restore` tool - Restore archived chunks to active storage
+- `mcp_server/tools/retention.py` - Core retention logic (400+ LOC)
+- 3-zone architecture: ACTIVE → ARCHIVE → PURGE
+- Gzip compression for archives (~70% size reduction)
+- Auto-restore on `peek()` - Archived chunks are transparently restored
+- Immunity system - Protected tags, access count, keywords
+- `context/archive/` directory for compressed chunks
+- `archive_index.json` - Index of archived chunks
+- `purge_log.json` - Log of purged chunks (metadata only)
+- 20 new tests in `tests/test_retention.py`
+
+### Retention Rules
+- **Archive after 30 days** if: `access_count == 0` AND not immune
+- **Purge after 180 days** in archive if: still unused AND not immune
+- **Immunity conditions**:
+  - Tags: `critical`, `decision`, `keep`, `important`
+  - `access_count >= 3` (frequently accessed)
+  - Keywords in content: `DECISION:`, `IMPORTANT:`, `A RETENIR:`
+
+### Examples
+```python
+# Preview actions (dry-run)
+rlm_retention_preview()
+
+# Archive old unused chunks
+rlm_retention_run(archive=True)
+
+# Archive AND purge (explicit)
+rlm_retention_run(archive=True, purge=True)
+
+# Manually restore an archived chunk
+rlm_restore("2025-12-01_001")
+```
+
+### Technical
+- Atomic file operations (temp + rename)
+- Backward compatible index format
+- Purge log preserves metadata, never content
 
 ---
 

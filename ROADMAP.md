@@ -1,7 +1,7 @@
 # RLM - Roadmap
 
 > Pistes futures pour RLM - Memoire infinie pour Claude Code
-> **Derniere MAJ** : 2026-01-18
+> **Derniere MAJ** : 2026-01-19
 
 ---
 
@@ -13,7 +13,7 @@
 | **Phase 2** | VALIDEE | Navigation tools (chunk/peek/grep/list) |
 | **Phase 3** | VALIDEE | Auto-chunking + Skill /rlm-analyze |
 | **Phase 4** | VALIDEE | Production (auto-summary, dedup, access tracking) |
-| **Phase 5** | VALIDEE | Avance (BM25, multi-sessions, sub-agents) |
+| **Phase 5** | VALIDEE | Avance (BM25, fuzzy, multi-sessions, retention) |
 | **Phase 6** | EN COURS | Production-Ready (tests, CI/CD, PyPI) |
 
 ---
@@ -381,11 +381,17 @@ Alternative si performance critique : `rapidfuzz` (Cython, 10x plus rapide).
 - Detection auto projet via git root ou cwd
 - Portabilite : domains.json/sessions.json sont locaux (git-ignored)
 
-### 5.6 Retention (Gestion du cycle de vie) - A FAIRE
+### 5.6 Retention (Gestion du cycle de vie) - FAIT (v0.7.0)
 
 **Objectif** : Eviter l'accumulation infinie de chunks avec archivage intelligent et purge automatique.
 
-**Pourquoi maintenant** :
+**Implemente le 2026-01-19** :
+- `mcp_server/tools/retention.py` - Core logic (~420 LOC)
+- 3 nouveaux tools MCP : `rlm_retention_preview`, `rlm_retention_run`, `rlm_restore`
+- Auto-restore dans `peek()` - Chunks archives restaures automatiquement
+- 20 tests dans `tests/test_retention.py`
+
+**Pourquoi c'etait necessaire** :
 - 17 chunks en une demi-journee → 100+ en quelques jours d'usage intensif
 - Sans retention, le grep/search devient lent et bruite
 - Besoin de garder les chunks importants et archiver/purger les autres
@@ -748,20 +754,20 @@ def test_auto_restore_on_peek():
 
 | Tache | Priorite | Statut |
 |-------|----------|--------|
-| Creer `mcp_server/tools/retention.py` | P0 | A FAIRE |
-| Implementer `is_immune()` | P0 | A FAIRE |
-| Implementer `archive_chunk()` / `restore_chunk()` | P0 | A FAIRE |
-| Implementer `get_archive_candidates()` | P0 | A FAIRE |
-| Tool `rlm_retention_preview` | P0 | A FAIRE |
-| Tool `rlm_retention_run` | P0 | A FAIRE |
-| Tool `rlm_restore` | P0 | A FAIRE |
-| Auto-restore dans `peek()` | P1 | A FAIRE |
-| `archive_index.json` gestion | P1 | A FAIRE |
-| `purge_log.json` gestion | P2 | A FAIRE |
-| Tests complets | P0 | A FAIRE |
-| Documentation usage | P1 | A FAIRE |
+| Creer `mcp_server/tools/retention.py` | P0 | FAIT |
+| Implementer `is_immune()` | P0 | FAIT |
+| Implementer `archive_chunk()` / `restore_chunk()` | P0 | FAIT |
+| Implementer `get_archive_candidates()` | P0 | FAIT |
+| Tool `rlm_retention_preview` | P0 | FAIT |
+| Tool `rlm_retention_run` | P0 | FAIT |
+| Tool `rlm_restore` | P0 | FAIT |
+| Auto-restore dans `peek()` | P1 | FAIT |
+| `archive_index.json` gestion | P1 | FAIT |
+| `purge_log.json` gestion | P2 | FAIT |
+| Tests complets (20 tests) | P0 | FAIT |
+| Documentation usage | P1 | FAIT |
 
-**Effort estime** : 2 sessions
+**Complete en 1 session (2026-01-19)**
 
 ---
 

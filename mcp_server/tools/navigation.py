@@ -39,6 +39,7 @@ except ImportError:
 # Paths
 CONTEXT_DIR = Path(__file__).parent.parent.parent / "context"
 CHUNKS_DIR = CONTEXT_DIR / "chunks"
+ARCHIVE_DIR = CONTEXT_DIR / "archive"
 INDEX_FILE = CONTEXT_DIR / "index.json"
 
 
@@ -447,6 +448,7 @@ def peek(
     Can read the whole chunk or just a portion (by line numbers).
 
     Phase 4.3: Increments access counter on successful read.
+    Phase 5.6: Auto-restores from archive if not in active storage.
 
     Args:
         chunk_id: ID of the chunk to read
@@ -458,11 +460,30 @@ def peek(
     """
     chunk_file = CHUNKS_DIR / f"{chunk_id}.md"
 
+    # Phase 5.6: Check archives if not in active storage
     if not chunk_file.exists():
-        return {
-            "status": "not_found",
-            "message": f"Chunk {chunk_id} not found"
-        }
+        archive_file = ARCHIVE_DIR / f"{chunk_id}.md.gz"
+        if archive_file.exists():
+            # Auto-restore from archive
+            try:
+                from .retention import restore_chunk
+                result = restore_chunk(chunk_id)
+                if result["status"] != "restored":
+                    return {
+                        "status": "error",
+                        "message": f"Failed to restore {chunk_id} from archive: {result['message']}"
+                    }
+                # Now chunk_file should exist
+            except ImportError:
+                return {
+                    "status": "error",
+                    "message": f"Chunk {chunk_id} is archived but retention module unavailable"
+                }
+        else:
+            return {
+                "status": "not_found",
+                "message": f"Chunk {chunk_id} not found"
+            }
 
     with open(chunk_file, "r", encoding="utf-8") as f:
         lines = f.readlines()

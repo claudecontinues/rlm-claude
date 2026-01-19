@@ -1,7 +1,7 @@
 # RLM - Contexte de Session
 
 > **Fichier de reprise** : A lire au debut de chaque session pour restaurer le contexte complet.
-> **Derniere MAJ** : 2026-01-19 (Phase 6 Production-Ready en cours)
+> **Derniere MAJ** : 2026-01-19 (Phase 5.6 Retention complete - v0.7.0)
 
 ---
 
@@ -195,7 +195,7 @@ Letta benchmark : filesystem + grep = 74% accuracy > Mem0 avec embeddings (68.5%
 | **5.5a Multi-sessions Fondation** | Format enrichi + detection projet | FAIT |
 | **5.5b Multi-sessions Tracking** | sessions.py + tools | FAIT |
 | **5.5c Multi-sessions Cross-session** | Filtres project/domain dans grep/search | FAIT |
-| **5.6 Retention** | LRU-Soft + immunite auto | A FAIRE |
+| **5.6 Retention** | Archive/restore/purge + immunite auto | FAIT (v0.7.0) |
 
 ### Phase 6 : Production-Ready (MVP+ Communaute) - EN COURS (2026-01-19)
 
@@ -217,15 +217,16 @@ Letta benchmark : filesystem + grep = 74% accuracy > Mem0 avec embeddings (68.5%
 
 **Ordre d'implementation valide (2026-01-19)** :
 1. ~~**5.2 Grep++** → Fuzzy search~~ **FAIT** (v0.6.1)
-2. **5.6 Retention** → Gestion accumulation (prochain)
-3. **Phase 6 Tests** → Completer coverage 80%+
+2. ~~**5.6 Retention** → Gestion accumulation~~ **FAIT** (v0.7.0)
+3. **Phase 6 Tests** → Completer coverage 80%+ (prochain)
 4. **PyPI** → Publication communaute
 
-**Pour reprendre Retention (5.6)** :
-```
-rlm_peek("2026-01-19_RLM_002_r&d")  # Contexte session planning
-# Puis lire ROADMAP.md section 5.6
-```
+**Phase 5.6 Retention implementee (2026-01-19)** :
+- 3 nouveaux tools : `rlm_retention_preview`, `rlm_retention_run`, `rlm_restore`
+- Architecture 3 zones : ACTIF → ARCHIVE (.gz) → PURGE
+- Auto-restore transparent dans `peek()`
+- Immunite : tags critical/decision, access_count >= 3, keywords DECISION:/IMPORTANT:
+- 20 tests dans `tests/test_retention.py`
 
 **Phase 5.5 COMPLETE** (2026-01-18) :
 
@@ -329,6 +330,14 @@ Voir [ROADMAP.md](ROADMAP.md) pour les details.
 | `rlm_grep` | + filtres `project=`, `domain=` | OK |
 | `rlm_search` | + filtres `project=`, `domain=` | OK |
 
+### Phase 5.6 - Retention
+
+| Tool | Description | Statut |
+|------|-------------|--------|
+| `rlm_retention_preview` | Preview des actions (dry-run) | OK |
+| `rlm_retention_run` | Executer archivage/purge | OK |
+| `rlm_restore` | Restaurer un chunk archive | OK |
+
 ### Phase 3 - Auto-chunking & Skills
 
 | Composant | Description | Statut |
@@ -361,11 +370,12 @@ Voir [ROADMAP.md](ROADMAP.md) pour les details.
 
 | Fichier | Description |
 |---------|-------------|
-| `mcp_server/server.py` | Serveur MCP principal (11 tools) |
+| `mcp_server/server.py` | Serveur MCP principal (14 tools) |
 | `mcp_server/tools/memory.py` | Fonctions Phase 1 |
-| `mcp_server/tools/navigation.py` | Fonctions Phase 2 + 5.5 |
+| `mcp_server/tools/navigation.py` | Fonctions Phase 2 + 5.5 + auto-restore |
 | `mcp_server/tools/search.py` | BM25 search (Phase 5.1) |
 | `mcp_server/tools/sessions.py` | Sessions + domaines (Phase 5.5) |
+| `mcp_server/tools/retention.py` | Archive/restore/purge (Phase 5.6) |
 | `hooks/auto_chunk_check.py` | Detection auto-chunk |
 | `hooks/reset_chunk_counter.py` | Reset compteur |
 | `templates/skills/rlm-analyze/skill.md` | Skill analyse 1 chunk |
@@ -375,6 +385,9 @@ Voir [ROADMAP.md](ROADMAP.md) pour les details.
 | `context/sessions.json` | Index des sessions (Phase 5.5) |
 | `context/domains.json` | Domaines suggeres (Phase 5.5) |
 | `context/chunks/*.md` | Chunks de conversation |
+| `context/archive/*.md.gz` | Chunks archives (Phase 5.6) |
+| `context/archive_index.json` | Index des archives (Phase 5.6) |
+| `context/purge_log.json` | Log des purges (Phase 5.6) |
 
 ---
 
@@ -458,13 +471,17 @@ rlm_chunk("content")   -> Auto-summary + dedup
 rlm_search("query")    -> Recherche BM25 (Phase 5.1)
 rlm_sessions()         -> Lister les sessions (Phase 5.5)
 rlm_domains()          -> Lister les domaines (Phase 5.5)
+rlm_retention_preview() -> Voir ce qui serait archive/purge (Phase 5.6)
+rlm_retention_run()    -> Archiver les vieux chunks (Phase 5.6)
+rlm_restore("chunk_id") -> Restaurer un chunk archive (Phase 5.6)
 /rlm-analyze chunk_id "question"  -> Analyser 1 chunk
 /rlm-parallel "question"          -> Analyser 3 chunks en parallele
 ```
 
-### Prochaines phases apres 6
+### Prochaines etapes
 - ~~**5.2 Grep++** : Fuzzy matching + scoring (thefuzz)~~ **FAIT** (v0.6.1)
-- **5.6 Retention** : LRU-Soft + immunite auto (prochain)
+- ~~**5.6 Retention** : Archive/restore/purge + immunite auto~~ **FAIT** (v0.7.0)
+- **Phase 6 Tests** : Completer coverage 80%+ (prochain)
 
 ---
 

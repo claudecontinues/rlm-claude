@@ -19,6 +19,7 @@ from tools.memory import remember, recall, forget, memory_status
 from tools.navigation import chunk, peek, grep, list_chunks
 from tools.search import search as bm25_search
 from tools.sessions import list_sessions, list_domains
+from tools.retention import retention_preview, retention_run, restore, get_archive_stats
 
 # Initialize the MCP server
 mcp = FastMCP("RLM Server")
@@ -507,6 +508,126 @@ def rlm_domains() -> str:
     output.append(f"\n\nNote: You can use any domain, these are just suggestions.")
 
     return "".join(output)
+
+
+# =============================================================================
+# RETENTION TOOLS (Phase 5.6)
+# =============================================================================
+
+@mcp.tool()
+def rlm_retention_preview() -> str:
+    """
+    Preview retention actions without executing.
+
+    Shows what would be archived or purged based on current rules.
+    Use this to validate before running rlm_retention_run().
+    """
+    result = retention_preview()
+
+    output = [
+        "Retention Preview (dry-run)\n"
+        "=" * 40
+    ]
+
+    # Archive candidates
+    archive_count = result["archive_count"]
+    output.append(f"\nArchive candidates ({archive_count}):")
+
+    if archive_count == 0:
+        output.append("  None - all chunks are recent, accessed, or immune")
+    else:
+        for c in result["archive_candidates"][:10]:
+            tags_str = f" [{', '.join(c['tags'][:3])}]" if c.get("tags") else ""
+            output.append(
+                f"  - {c['id']}{tags_str}\n"
+                f"    {c['summary']}... (access: {c['access_count']})"
+            )
+        if archive_count > 10:
+            output.append(f"  ... and {archive_count - 10} more")
+
+    # Purge candidates
+    purge_count = result["purge_count"]
+    output.append(f"\nPurge candidates ({purge_count}):")
+
+    if purge_count == 0:
+        output.append("  None - no archives old enough for purging")
+    else:
+        for c in result["purge_candidates"][:10]:
+            output.append(
+                f"  - {c['id']} (archived: {c['archived_at']})\n"
+                f"    {c['summary']}..."
+            )
+        if purge_count > 10:
+            output.append(f"  ... and {purge_count - 10} more")
+
+    return "\n".join(output)
+
+
+@mcp.tool()
+def rlm_retention_run(archive: bool = True, purge: bool = False) -> str:
+    """
+    Execute retention actions.
+
+    Args:
+        archive: Archive old unused chunks (default: True)
+        purge: Purge very old archives (default: False, requires explicit)
+
+    Returns:
+        Summary of actions taken
+    """
+    result = retention_run(archive=archive, purge=purge)
+
+    output = [
+        "Retention Execution\n"
+        "=" * 40
+    ]
+
+    # Archived
+    if result["archived_count"] > 0:
+        output.append(f"\n✓ Archived {result['archived_count']} chunk(s):")
+        for chunk_id in result["archived"][:5]:
+            output.append(f"  - {chunk_id}")
+        if result["archived_count"] > 5:
+            output.append(f"  ... and {result['archived_count'] - 5} more")
+    else:
+        output.append("\n✓ No chunks archived")
+
+    # Purged
+    if result["purged_count"] > 0:
+        output.append(f"\n✓ Purged {result['purged_count']} archive(s):")
+        for chunk_id in result["purged"][:5]:
+            output.append(f"  - {chunk_id}")
+        if result["purged_count"] > 5:
+            output.append(f"  ... and {result['purged_count'] - 5} more")
+    elif purge:
+        output.append("\n✓ No archives purged")
+
+    # Errors
+    if result["error_count"] > 0:
+        output.append(f"\n✗ Errors ({result['error_count']}):")
+        for error in result["errors"][:3]:
+            output.append(f"  - {error}")
+
+    return "\n".join(output)
+
+
+@mcp.tool()
+def rlm_restore(chunk_id: str) -> str:
+    """
+    Restore an archived chunk back to active storage.
+
+    Args:
+        chunk_id: ID of the archived chunk
+
+    Returns:
+        Confirmation message
+    """
+    result = restore(chunk_id)
+
+    if result["status"] == "restored":
+        return f"✓ {result['message']}"
+    else:
+        return f"✗ {result['message']}"
 
 
 # =============================================================================

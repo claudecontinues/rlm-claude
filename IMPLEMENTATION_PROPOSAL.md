@@ -1,8 +1,8 @@
 # Proposition d'Implémentation : RLM Maison pour Claude Code
 
-> **Version** : 2.1 (Mise à jour Phase 5.2 Fuzzy)
+> **Version** : 2.2 (Mise à jour Phase 5.6 Retention)
 > **Date** : 2026-01-19
-> **Statut** : Production - Phase 5 presque complète
+> **Statut** : Production - Phase 5 complete, Phase 6 en cours
 
 ---
 
@@ -88,26 +88,27 @@ rlm-minimal est un **excellent référentiel conceptuel** mais l'adapter prendra
 
 | # | Capacité | Description | Notre solution |
 |---|----------|-------------|----------------|
-| 1 | **Navigation contexte** | Peek/Grep dans 10M+ tokens | ✅ Via Grep/Read tools |
-| 2 | **Sub-LLM calls** | Déléguer à des instances parallèles | ✅ Via Task subagents |
-| 3 | **Chunking intelligent** | Découper par sémantique | ⏳ À implémenter |
+| 1 | **Navigation contexte** | Peek/Grep dans 10M+ tokens | ✅ rlm_peek/grep/search |
+| 2 | **Sub-LLM calls** | Déléguer à des instances parallèles | ✅ /rlm-parallel skill |
+| 3 | **Chunking intelligent** | Découper par sémantique | ✅ rlm_chunk + auto-summary |
 | 4 | **Agrégation résultats** | Combiner les réponses sub-calls | ✅ Via Claude synthèse |
-| 5 | **Mémoire de session** | Retenir les insights importants | ⏳ session_memory.md |
-| 6 | **Persistance chunks** | Stocker hors contexte | ⏳ Fichiers à créer |
-| 7 | **Index/métadonnées** | Retrouver les chunks pertinents | ⏳ index.json |
+| 5 | **Mémoire de session** | Retenir les insights importants | ✅ rlm_remember/recall |
+| 6 | **Persistance chunks** | Stocker hors contexte | ✅ context/chunks/ |
+| 7 | **Index/métadonnées** | Retrouver les chunks pertinents | ✅ index.json + BM25 |
 | 8 | **Stratégies émergentes** | Peeking, grepping, partition | ✅ Via prompts adaptés |
 | 9 | **Terminaison propre** | Détecter la fin | ✅ Naturel avec Claude |
-| 10 | **Coût contrôlé** | Pas d'explosion tokens | ⚠️ À monitorer |
+| 10 | **Coût contrôlé** | Pas d'explosion tokens | ✅ Retention (archive/purge) |
 
 ### Capacités bonus (au-delà du papier)
 
 | # | Capacité | Description | Notre solution |
 |---|----------|-------------|----------------|
-| 11 | **Persistance inter-sessions** | Garder entre sessions | ✅ Fichiers + FOCUS_ACTUEL |
+| 11 | **Persistance inter-sessions** | Garder entre sessions | ✅ Fichiers + multi-sessions |
 | 12 | **Intégration native** | Pas de setup externe | ✅ Skills + MCP |
-| 13 | **Résumés automatiques** | Chunks avec summaries | ⏳ Via Claude |
-| 14 | **Recherche sémantique** | Au-delà du keyword | ⏳ Option future |
-| 15 | **Hooks automatiques** | Chunking auto | ⏳ Via Claude hooks |
+| 13 | **Résumés automatiques** | Chunks avec summaries | ✅ Auto-summary Phase 4 |
+| 14 | **Recherche sémantique** | Au-delà du keyword | ✅ BM25 + Fuzzy search |
+| 15 | **Hooks automatiques** | Chunking auto | ✅ Hooks Claude Code |
+| 16 | **Retention intelligente** | Archive/purge avec immunité | ✅ Phase 5.6 (v0.7.0) |
 
 ---
 
