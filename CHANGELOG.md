@@ -1,0 +1,166 @@
+# Changelog
+
+All notable changes to RLM are documented here.
+
+Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+### Planned
+- Phase 6: Production-Ready (tests, CI/CD, PyPI distribution)
+- Phase 5.6: Retention (LRU-Soft + auto-immunity)
+
+---
+
+## [0.6.1] - 2026-01-19 - Phase 5.2 Grep++ (Fuzzy Search)
+
+### Added
+- `grep_fuzzy()` function - Fuzzy matching with thefuzz library
+- `rlm_grep(..., fuzzy=True, fuzzy_threshold=80)` - Tolerates typos in searches
+- Score-based ranking - Best matches first
+- 16 new tests in `tests/test_grep_fuzzy.py`
+
+### Examples
+- `rlm_grep("buisness", fuzzy=True)` finds "business"
+- `rlm_grep("validaton", fuzzy=True)` finds "validation"
+- `rlm_grep("senario", fuzzy=True)` finds "scenario"
+
+### Dependencies
+- Added `thefuzz>=0.22.1` as optional dependency (`pip install mcp-rlm-server[fuzzy]`)
+- Graceful degradation: Returns error message if thefuzz not installed
+
+### Technical
+- Uses `fuzz.partial_ratio` for substring matching
+- Default threshold: 80 (adjustable 0-100)
+- Integrates with existing project/domain filters
+
+---
+
+## [0.6.0] - 2026-01-18 - Phase 5.5 Multi-sessions COMPLETE
+
+### Added
+- `rlm_sessions` tool - List sessions by project/domain
+- `rlm_domains` tool - List available domains (31 default)
+- New chunk ID format: `{date}_{project}_{seq}[_{ticket}][_{domain}]`
+- Project auto-detection via `RLM_PROJECT` env, git root, or cwd
+- `domains.json.example` - Template with Joy Juice domains
+- Cross-session filtering: `rlm_grep(..., project="X", domain="Y")`
+- Cross-session filtering: `rlm_search(..., project="X", domain="Y")`
+- `sessions.json` - Session index (auto-created, git-ignored)
+- `domains.json` - Domain suggestions (auto-created, git-ignored)
+
+### Fixed
+- **Bugfix b691d9f**: `chunk()` now properly calls `register_session()` and `add_chunk_to_session()`
+
+### Changed
+- Backward compatibility: Chunks in format 1.0 (`YYYY-MM-DD_NNN`) remain accessible
+
+---
+
+## [0.5.1] - 2026-01-18 - Phase 5.1 BM25 Search
+
+### Added
+- `rlm_search` tool - BM25 ranking search (FR/EN)
+- `mcp_server/tools/search.py` - BM25S implementation (500x faster than rank_bm25)
+- `mcp_server/tools/tokenizer_fr.py` - Zero-dependency FR/EN tokenization
+- Accent normalization: `realiste` matches `réaliste`
+- Stopwords filtering (French + English)
+- Compound word splitting: `jus-de-fruits` → `[jus, fruits]`
+
+### Dependencies
+- Added `bm25s>=0.2.0` (optional, for search feature)
+
+---
+
+## [0.5.0] - 2026-01-18 - Phase 5.3 Sub-agents
+
+### Added
+- Skill `/rlm-parallel` - Parallel chunk analysis (Partition + Map pattern)
+- 3 parallel Task tools (Sonnet) + 1 merger
+- Automatic contradiction detection
+- Citation format with `[chunk_id]` references
+
+### Notes
+- MCP Sampling not supported by Claude Code (issue #1785) → Skill = only option
+- Cost: $0 (Task tools included in Claude Code Pro/Max)
+
+---
+
+## [0.4.0] - 2026-01-18 - Phase 4 Production
+
+### Added
+- Auto-summarization when no summary provided (first line extraction)
+- Duplicate detection via MD5 content hash
+- Access counting for chunks (`access_count`, `last_accessed`)
+- Most-accessed chunks display in `rlm_status()`
+
+### Fixed
+- Hook `Stop` format: Use `systemMessage` (not `hookSpecificOutput.additionalContext`)
+- Removed unsupported `"matcher": "*"` from Stop hook
+
+### Changed
+- `index.json` upgraded to v2.0.0 with extended metadata
+
+---
+
+## [0.3.0] - 2026-01-18 - Phase 3 Auto-chunking
+
+### Added
+- Hook `auto_chunk_check.py` - Detects when chunking is needed
+- Hook `reset_chunk_counter.py` - Resets counter after `rlm_chunk`
+- Skill `/rlm-analyze` - Analyze single chunk with sub-agent
+- `install.sh` - One-command installation script
+- `templates/hooks_settings.json` - Hook configuration template
+- `templates/CLAUDE_RLM_SNIPPET.md` - CLAUDE.md instructions
+
+### Configuration
+- Turns threshold: 10 (configurable)
+- Time threshold: 30 minutes (configurable)
+
+---
+
+## [0.2.0] - 2026-01-18 - Phase 2 Navigation
+
+### Added
+- `rlm_chunk` tool - Save content to external chunk file
+- `rlm_peek` tool - Read chunk content (with optional line range)
+- `rlm_grep` tool - Search regex patterns across all chunks
+- `rlm_list_chunks` tool - List chunks with metadata
+- `context/chunks/` directory for chunk storage
+- `context/index.json` for chunk indexing
+
+### Format
+- Chunk ID format v1.0: `YYYY-MM-DD_NNN`
+- Chunk files: Markdown with YAML frontmatter
+
+---
+
+## [0.1.0] - 2026-01-18 - Phase 1 Memory
+
+### Added
+- `rlm_remember` tool - Save insights (decision, fact, preference, finding, todo, general)
+- `rlm_recall` tool - Retrieve insights by query, category, or importance
+- `rlm_forget` tool - Delete insight by ID
+- `rlm_status` tool - System status (insights count, categories, importance levels)
+- `context/session_memory.json` for insight storage
+- MCP server with stdio transport (FastMCP)
+
+### Importance Levels
+- `low`, `medium`, `high`, `critical`
+
+### Categories
+- `decision`, `fact`, `preference`, `finding`, `todo`, `general`
+
+---
+
+## References
+
+- [RLM Paper (MIT CSAIL)](https://arxiv.org/abs/2512.24601) - Zhang et al., Dec 2025
+- [MCP Specification](https://modelcontextprotocol.io/specification)
+- [Letta Benchmark](https://www.letta.com/blog/benchmarking-ai-agent-memory)
+
+---
+
+**Repository**: https://github.com/EncrEor/rlm-claude
+**Authors**: Ahmed MAKNI, Claude Opus 4.5

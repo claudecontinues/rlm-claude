@@ -1,0 +1,144 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "mcp-rlm-server"
+version = "0.6.1"
+description = "Infinite memory for Claude Code - MCP server inspired by MIT RLM paper"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+authors = [
+    { name = "Ahmed MAKNI", email = "ahmed@joyjuice.co" }
+]
+keywords = [
+    "mcp",
+    "model-context-protocol",
+    "claude",
+    "memory",
+    "llm",
+    "context-management",
+    "chunking",
+    "bm25",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+dependencies = [
+    "mcp>=1.0.0,<2.0.0",
+    "pydantic>=2.0.0,<3.0.0",
+]
+
+[project.optional-dependencies]
+search = [
+    "bm25s>=0.2.0",
+]
+fuzzy = [
+    "thefuzz>=0.22.1",
+]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "pytest-cov>=4.0",
+    "ruff>=0.1.0",
+]
+all = [
+    "mcp-rlm-server[search,fuzzy,dev]",
+]
+
+[project.scripts]
+mcp-rlm-server = "mcp_server.server:main"
+
+[project.urls]
+Homepage = "https://github.com/EncrEor/rlm-claude"
+Documentation = "https://github.com/EncrEor/rlm-claude#readme"
+Repository = "https://github.com/EncrEor/rlm-claude"
+Issues = "https://github.com/EncrEor/rlm-claude/issues"
+Changelog = "https://github.com/EncrEor/rlm-claude/blob/main/CHANGELOG.md"
+
+[tool.hatch.build.targets.wheel]
+packages = ["mcp_server"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/mcp_server",
+    "/hooks",
+    "/templates",
+    "/README.md",
+    "/CHANGELOG.md",
+    "/LICENSE",
+]
+
+# =============================================================================
+# Testing configuration
+# =============================================================================
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+addopts = [
+    "-v",
+    "--tb=short",
+]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+]
+
+[tool.coverage.run]
+source = ["mcp_server"]
+branch = true
+omit = [
+    "mcp_server/__main__.py",
+    "tests/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+]
+fail_under = 80
+
+# =============================================================================
+# Linting configuration
+# =============================================================================
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = [
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # Pyflakes
+    "I",      # isort
+    "B",      # flake8-bugbear
+    "C4",     # flake8-comprehensions
+    "UP",     # pyupgrade
+]
+ignore = [
+    "E501",   # line too long (handled by formatter)
+    "B008",   # do not perform function calls in argument defaults
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["mcp_server"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"

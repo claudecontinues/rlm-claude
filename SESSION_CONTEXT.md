@@ -1,7 +1,7 @@
 # RLM - Contexte de Session
 
 > **Fichier de reprise** : A lire au debut de chaque session pour restaurer le contexte complet.
-> **Derniere MAJ** : 2026-01-18 (Phase 5.5 en cours)
+> **Derniere MAJ** : 2026-01-19 (Phase 6 Production-Ready en cours)
 
 ---
 
@@ -179,7 +179,7 @@ rlm_peek("chunk_id")               → access_count incremente ✅
 rlm_status()                       → "Most accessed" affiche ✅
 ```
 
-### Phase 5 : RLM Authentique - EN COURS (2026-01-18)
+### Phase 5 : RLM Authentique - VALIDEE (2026-01-18)
 
 **Changement strategique** : Suite a recherche approfondie, Phase 5 redesignee pour suivre le paper MIT.
 
@@ -189,13 +189,43 @@ Letta benchmark : filesystem + grep = 74% accuracy > Mem0 avec embeddings (68.5%
 | Sous-phase | Description | Statut |
 |------------|-------------|--------|
 | **5.1 BM25S** | Ranking par pertinence (500x plus rapide) | FAIT |
-| **5.2 Grep++** | Fuzzy matching + scoring | A FAIRE |
+| **5.2 Grep++** | Fuzzy matching + scoring | FAIT |
 | **5.3 Sub-agents** | Analyse parallele (Partition + Map) | FAIT |
 | **5.4 Embeddings** | BACKUP seulement si BM25 < 70% | OPTIONNEL |
 | **5.5a Multi-sessions Fondation** | Format enrichi + detection projet | FAIT |
 | **5.5b Multi-sessions Tracking** | sessions.py + tools | FAIT |
 | **5.5c Multi-sessions Cross-session** | Filtres project/domain dans grep/search | FAIT |
 | **5.6 Retention** | LRU-Soft + immunite auto | A FAIRE |
+
+### Phase 6 : Production-Ready (MVP+ Communaute) - EN COURS (2026-01-19)
+
+**Objectif** : Preparer RLM pour distribution publique et adoption communautaire.
+
+| Sous-phase | Description | Statut |
+|------------|-------------|--------|
+| **6.1 Tests** | pytest, 80%+ coverage | EN COURS |
+| **6.2 CI/CD** | GitHub Actions, Codecov | FAIT (fichier cree) |
+| **6.3 Distribution** | pyproject.toml, PyPI | FAIT (fichier cree) |
+| **6.4 Robustesse** | Logging, atomic writes | A FAIRE |
+| **6.5 Documentation** | CHANGELOG, badges README | FAIT |
+
+**Fichiers crees (2026-01-19)** :
+- `CHANGELOG.md` - Historique retrospectif complet
+- `pyproject.toml` - Configuration moderne (remplace requirements.txt)
+- `.github/workflows/ci.yml` - CI/CD GitHub Actions
+- `tests/` - Structure de tests (conftest.py, test_tokenizer.py)
+
+**Ordre d'implementation valide (2026-01-19)** :
+1. ~~**5.2 Grep++** → Fuzzy search~~ **FAIT** (v0.6.1)
+2. **5.6 Retention** → Gestion accumulation (prochain)
+3. **Phase 6 Tests** → Completer coverage 80%+
+4. **PyPI** → Publication communaute
+
+**Pour reprendre Retention (5.6)** :
+```
+rlm_peek("2026-01-19_RLM_002_r&d")  # Contexte session planning
+# Puis lire ROADMAP.md section 5.6
+```
 
 **Phase 5.5 COMPLETE** (2026-01-18) :
 
@@ -380,48 +410,61 @@ cd /Users/amx/Documents/Joy_Claude/RLM && git add . && git commit -m "message" &
 
 ## 8. Prochaine Action
 
-**Phase 5.5 : Multi-sessions** - EN COURS (2026-01-18)
+**Phase 6 : Production-Ready** - EN COURS (2026-01-19)
 
-### Sous-phases Phase 5.5
+### Objectif
+Preparer RLM pour distribution publique (PyPI) et adoption par la communaute.
 
-| Sous-phase | Description | Statut |
-|------------|-------------|--------|
-| **5.5a** | Fondation (format ID, parse, detect_project) | EN COURS |
-| **5.5b** | Sessions (sessions.py, sessions.json, tools) | A FAIRE |
-| **5.5c** | Cross-session (@syntax, filtres grep/search) | A FAIRE |
+### Checklist MVP+
 
-### Decisions validees Phase 5.5
+| Tache | Priorite | Statut |
+|-------|----------|--------|
+| Structure `tests/` avec conftest.py | P0 | FAIT |
+| Tests tokenizer | P0 | FAIT |
+| Tests memory (remember/recall/forget) | P0 | A FAIRE |
+| Tests navigation (chunk/peek/grep) | P0 | A FAIRE |
+| Tests search (BM25) | P0 | A FAIRE |
+| Tests sessions | P0 | A FAIRE |
+| Coverage >= 80% | P0 | A FAIRE |
+| `.github/workflows/ci.yml` | P0 | FAIT |
+| `pyproject.toml` | P1 | FAIT |
+| `CHANGELOG.md` | P1 | FAIT |
+| Publication TestPyPI | P1 | A FAIRE |
+| Publication PyPI | P1 | A FAIRE |
+| Badges README | P1 | A FAIRE |
+| Section Development README | P1 | A FAIRE |
 
-| Question | Reponse |
-|----------|---------|
-| Scope | Tout d'un coup (5.5a + 5.5b + 5.5c) |
-| Migration | Chunks existants restent en format 1.0 |
-| Domaines | Flexibles - pas de validation stricte |
+### Fichiers crees (2026-01-19)
 
-### Fichiers a creer/modifier
+```
+RLM/
+├── CHANGELOG.md                    # Historique retrospectif
+├── pyproject.toml                  # Config moderne (remplace requirements.txt)
+├── .github/workflows/ci.yml        # CI/CD GitHub Actions
+└── tests/
+    ├── __init__.py
+    ├── conftest.py                 # Fixtures
+    ├── test_tokenizer.py           # Tests tokenizer (FAIT)
+    └── integration/
+        └── __init__.py
+```
 
-| Fichier | Action |
-|---------|--------|
-| `navigation.py` | Modifier - nouveau format ID |
-| `sessions.py` | CREER - gestion sessions |
-| `server.py` | Modifier - nouveaux tools |
-| `domains.json` | CREER - domaines suggeres |
-| `sessions.json` | CREER - index sessions |
-
-**Prochaines phases apres 5.5** :
-- **5.2 Grep++** : Fuzzy matching + scoring (thefuzz)
-- **5.6 Retention** : LRU-Soft + immunite auto
-
-**Pour tester les tools existants** :
+### Pour tester les tools existants
 ```
 rlm_status()           -> Insights + Chunks stats + Most accessed
 rlm_list_chunks()      -> Liste des chunks avec access_count
 rlm_recall()           -> Insights sauvegardes
 rlm_chunk("content")   -> Auto-summary + dedup
 rlm_search("query")    -> Recherche BM25 (Phase 5.1)
+rlm_sessions()         -> Lister les sessions (Phase 5.5)
+rlm_domains()          -> Lister les domaines (Phase 5.5)
 /rlm-analyze chunk_id "question"  -> Analyser 1 chunk
 /rlm-parallel "question"          -> Analyser 3 chunks en parallele
 ```
+
+### Prochaines phases apres 6
+- ~~**5.2 Grep++** : Fuzzy matching + scoring (thefuzz)~~ **FAIT** (v0.6.1)
+- **5.6 Retention** : LRU-Soft + immunite auto (prochain)
 
 ---
 

@@ -1,8 +1,8 @@
 # Proposition d'Implémentation : RLM Maison pour Claude Code
 
-> **Version** : 2.0 (Mise à jour après analyse approfondie)
-> **Date** : 2026-01-18
-> **Statut** : En exploration - Solution définitive visée
+> **Version** : 2.1 (Mise à jour Phase 5.2 Fuzzy)
+> **Date** : 2026-01-19
+> **Statut** : Production - Phase 5 presque complète
 
 ---
 
@@ -496,14 +496,24 @@ Après analyse, **MCP Server + Hooks** est l'approche la plus puissante et pére
 | 4.3 | Skill `/rlm-status` | Vue d'ensemble |
 | 4.4 | Optimisations | Performance tuning |
 
-### Phase 5 : Avancé (Futur)
+### Phase 5 : Avancé - EN COURS
 
-| Tâche | Description | Livrable |
-|-------|-------------|----------|
-| 5.1 | Embeddings locaux | SQLite + sentence-transformers |
-| 5.2 | Recherche sémantique | Tool `rlm_search` |
-| 5.3 | Multi-sessions | Historique long-terme |
-| 5.4 | Analytics | Dashboard usage |
+| Tâche | Description | Statut |
+|-------|-------------|--------|
+| 5.1 | BM25 search (FR/EN) | ✅ FAIT |
+| 5.2 | Fuzzy grep (tolère typos) | ✅ FAIT (v0.6.1) |
+| 5.3 | Sub-agents parallèles | ✅ FAIT (/rlm-parallel) |
+| 5.5 | Multi-sessions | ✅ FAIT (sessions, domains) |
+| 5.6 | Retention (archive/purge) | ⏳ À FAIRE |
+
+### Phase 6 : Production-Ready - PROCHAINE
+
+| Tâche | Description | Statut |
+|-------|-------------|--------|
+| 6.1 | Tests automatisés (80%+) | ⏳ En cours |
+| 6.2 | CI/CD GitHub Actions | ✅ Fichier créé |
+| 6.3 | Distribution PyPI | ⏳ À FAIRE |
+| 6.4 | Robustesse (logging, atomic) | ⏳ À FAIRE |
 
 ---
 
@@ -585,6 +595,6 @@ Tu disposes d'outils RLM pour naviguer dans le contexte étendu.
 
 ---
 
-**Version** : 2.0
-**Date** : 2026-01-18
-**Statut** : En exploration approfondie - Architecture définitive proposée
+**Version** : 2.1
+**Date** : 2026-01-19
+**Statut** : Production - Phase 5.2 Fuzzy Grep complète

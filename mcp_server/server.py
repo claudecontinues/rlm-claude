@@ -270,7 +270,9 @@ def rlm_grep(
     pattern: str,
     limit: int = 10,
     project: str = "",
-    domain: str = ""
+    domain: str = "",
+    fuzzy: bool = False,
+    fuzzy_threshold: int = 80
 ) -> str:
     """
     Search for a pattern across all saved chunks.
@@ -278,6 +280,7 @@ def rlm_grep(
     Use this to find where a topic was discussed or where specific
     information is stored in your conversation history.
 
+    Phase 5.2: Supports fuzzy matching (tolerates typos like "validaton" → "validation").
     Phase 5.5c: Supports filtering by project and domain.
 
     Args:
@@ -285,6 +288,8 @@ def rlm_grep(
         limit: Maximum number of matches to return (default: 10)
         project: Filter by project name (e.g., "RLM", "JoyJuice")
         domain: Filter by domain (e.g., "bp", "seo", "r&d")
+        fuzzy: Enable fuzzy matching (tolerates typos, Phase 5.2)
+        fuzzy_threshold: Minimum similarity score 0-100 for fuzzy (default: 80)
 
     Returns:
         List of matches with chunk IDs and context
@@ -293,8 +298,14 @@ def rlm_grep(
         pattern,
         limit,
         project=project if project else None,
-        domain=domain if domain else None
+        domain=domain if domain else None,
+        fuzzy=fuzzy,
+        fuzzy_threshold=fuzzy_threshold
     )
+
+    # Handle error (e.g., thefuzz not installed)
+    if result.get("status") == "error":
+        return f"Error: {result['message']}"
 
     if result["match_count"] == 0:
         filters = []
@@ -302,14 +313,20 @@ def rlm_grep(
             filters.append(f"project={project}")
         if domain:
             filters.append(f"domain={domain}")
+        if fuzzy:
+            filters.append(f"fuzzy≥{fuzzy_threshold}")
         filter_str = f" (filters: {', '.join(filters)})" if filters else ""
         return f"No matches found for pattern: {pattern}{filter_str}"
 
-    output = [f"Found {result['match_count']} match(es) for '{pattern}':\n"]
+    # Build output header
+    fuzzy_str = f" (fuzzy≥{result.get('threshold', 80)})" if result.get("fuzzy") else ""
+    output = [f"Found {result['match_count']} match(es) for '{pattern}'{fuzzy_str}:\n"]
 
     for i, match in enumerate(result["matches"], 1):
+        # Include score if fuzzy
+        score_str = f" score:{match['score']}" if "score" in match else ""
         output.append(
-            f"{i}. [{match['chunk_id']}] line {match['line_number']}\n"
+            f"{i}. [{match['chunk_id']}] line {match['line_number']}{score_str}\n"
             f"   Summary: {match['chunk_summary']}\n"
             f"   Context: {match['context'][:200]}{'...' if len(match['context']) > 200 else ''}"
         )

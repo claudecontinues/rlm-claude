@@ -28,6 +28,13 @@ from typing import Optional
 # Phase 5.5: Session tracking
 from .sessions import register_session, add_chunk_to_session
 
+# Phase 5.2: Fuzzy matching (optional dependency)
+try:
+    from thefuzz import fuzz
+    FUZZY_AVAILABLE = True
+except ImportError:
+    FUZZY_AVAILABLE = False
+
 
 # Paths
 CONTEXT_DIR = Path(__file__).parent.parent.parent / "context"
@@ -496,7 +503,9 @@ def grep(
     limit: int = 10,
     context_lines: int = 1,
     project: str = None,
-    domain: str = None
+    domain: str = None,
+    fuzzy: bool = False,
+    fuzzy_threshold: int = 80
 ) -> dict:
     """
     Search for a pattern across all chunks.
@@ -504,6 +513,7 @@ def grep(
     Use this to find where a topic was discussed or where
     specific information is stored.
 
+    Phase 5.2: Supports fuzzy matching (tolerates typos).
     Phase 5.5c: Supports filtering by project and domain.
 
     Args:
@@ -512,10 +522,16 @@ def grep(
         context_lines: Number of lines before/after match to include
         project: Filter by project name (Phase 5.5c)
         domain: Filter by domain (Phase 5.5c)
+        fuzzy: Enable fuzzy matching (Phase 5.2)
+        fuzzy_threshold: Minimum similarity score 0-100 (Phase 5.2)
 
     Returns:
         Dictionary with list of matches
     """
+    # Phase 5.2: Dispatch to fuzzy search if enabled
+    if fuzzy:
+        return grep_fuzzy(pattern, fuzzy_threshold, limit, project, domain)
+
     index = _load_index()
     matches = []
 
@@ -577,6 +593,101 @@ def grep(
         "pattern": pattern,
         "match_count": len(matches),
         "matches": matches
+    }
+
+
+# =============================================================================
+# PHASE 5.2: Fuzzy Search (Grep++)
+# =============================================================================
+
+def grep_fuzzy(
+    pattern: str,
+    threshold: int = 80,
+    limit: int = 10,
+    project: str = None,
+    domain: str = None
+) -> dict:
+    """
+    Fuzzy grep - find matches even with typos (Phase 5.2).
+
+    Uses thefuzz library for approximate string matching.
+    Tolerates typos like "validaton" finding "validation".
+
+    Args:
+        pattern: Text to search for (not regex, fuzzy matching)
+        threshold: Minimum similarity score 0-100 (default: 80)
+        limit: Maximum number of matches to return
+        project: Filter by project name (Phase 5.5c)
+        domain: Filter by domain (Phase 5.5c)
+
+    Returns:
+        Dictionary with matches sorted by similarity score
+    """
+    if not FUZZY_AVAILABLE:
+        return {
+            "status": "error",
+            "message": "Fuzzy search requires thefuzz: pip install mcp-rlm-server[fuzzy]"
+        }
+
+    index = _load_index()
+    matches = []
+
+    for chunk_info in index.get("chunks", []):
+        # Phase 5.5c: Apply project/domain filters
+        if project and chunk_info.get("project") != project:
+            continue
+        if domain and chunk_info.get("domain") != domain:
+            continue
+
+        chunk_file = CONTEXT_DIR / chunk_info["file"]
+
+        if not chunk_file.exists():
+            continue
+
+        with open(chunk_file, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+
+        # Skip YAML header
+        content_start = 0
+        in_header = False
+        for i, line in enumerate(lines):
+            if line.strip() == "---":
+                if not in_header:
+                    in_header = True
+                else:
+                    content_start = i + 1
+                    break
+
+        content_lines = lines[content_start:]
+
+        # Search line by line with fuzzy matching
+        for i, line in enumerate(content_lines):
+            line_text = line.strip()
+            if not line_text:
+                continue
+
+            # partial_ratio finds best partial match (handles substrings)
+            score = fuzz.partial_ratio(pattern.lower(), line_text.lower())
+
+            if score >= threshold:
+                matches.append({
+                    "chunk_id": chunk_info["id"],
+                    "chunk_summary": chunk_info.get("summary", ""),
+                    "line_number": i + 1,
+                    "score": score,
+                    "context": line_text[:150]  # Truncate for readability
+                })
+
+    # Sort by score (highest first)
+    matches.sort(key=lambda x: x["score"], reverse=True)
+
+    return {
+        "status": "success",
+        "pattern": pattern,
+        "fuzzy": True,
+        "threshold": threshold,
+        "match_count": len(matches[:limit]),
+        "matches": matches[:limit]
     }
 
 

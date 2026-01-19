@@ -13,7 +13,8 @@
 | **Phase 2** | VALIDEE | Navigation tools (chunk/peek/grep/list) |
 | **Phase 3** | VALIDEE | Auto-chunking + Skill /rlm-analyze |
 | **Phase 4** | VALIDEE | Production (auto-summary, dedup, access tracking) |
-| **Phase 5** | EN COURS | Avance (BM25, multi-sessions, sub-agents) - 5.5 COMPLETE |
+| **Phase 5** | VALIDEE | Avance (BM25, multi-sessions, sub-agents) |
+| **Phase 6** | EN COURS | Production-Ready (tests, CI/CD, PyPI) |
 
 ---
 
@@ -75,13 +76,259 @@ def auto_summarize(content: str, max_tokens: int = 200) -> str:
 - `mcp_server/tools/search.py`
 - `mcp_server/tools/tokenizer_fr.py`
 
-### 5.2 Grep Optimise
+### 5.2 Grep++ (Fuzzy Search) - FAIT (v0.6.1)
 
-| Tache | Description | Priorite |
-|-------|-------------|----------|
-| Fuzzy matching | Tolerance typos (thefuzz) | P1 |
-| Multi-pattern | Chercher plusieurs termes | P2 |
-| Scoring | Trier resultats grep par pertinence | P2 |
+**Objectif** : Ameliorer `rlm_grep` avec tolerance aux typos et scoring de pertinence.
+
+**Implemente le 2026-01-19** :
+- `grep_fuzzy()` dans `navigation.py`
+- Parametres `fuzzy=True, fuzzy_threshold=80` dans `rlm_grep`
+- Dependance optionnelle `thefuzz>=0.22.1`
+- 16 tests dans `tests/test_grep_fuzzy.py`
+
+**Pourquoi c'etait necessaire** :
+- Avec 100+ chunks, les typos deviennent un vrai probleme
+- "buget" ne trouve pas "budget", "validaton" ne trouve pas "validation"
+- BM25 aide mais ne resout pas les typos dans les patterns de recherche
+
+---
+
+#### 5.2.1 Fuzzy Matching
+
+**Dependance** : `thefuzz>=0.22.1` (ex-fuzzywuzzy, plus maintenu)
+
+**Implementation proposee** :
+
+```python
+# Dans mcp_server/tools/navigation.py
+
+from thefuzz import fuzz, process
+
+def grep_fuzzy(
+    pattern: str,
+    threshold: int = 80,
+    limit: int = 10
+) -> dict:
+    """
+    Fuzzy grep - trouve des matches meme avec typos.
+
+    Args:
+        pattern: Texte a chercher (pas regex)
+        threshold: Score minimum de similarite (0-100, default 80)
+        limit: Nombre max de resultats
+
+    Returns:
+        Matches tries par score de similarite
+    """
+    matches = []
+
+    for chunk_file in CHUNKS_DIR.glob("*.md"):
+        content = chunk_file.read_text()
+
+        # Chercher ligne par ligne
+        for i, line in enumerate(content.split('\n')):
+            # Score de similarite partielle (trouve sous-chaines)
+            score = fuzz.partial_ratio(pattern.lower(), line.lower())
+
+            if score >= threshold:
+                matches.append({
+                    "chunk_id": chunk_file.stem,
+                    "line": i + 1,
+                    "score": score,
+                    "text": line.strip()[:100]  # Tronquer pour lisibilite
+                })
+
+    # Trier par score decroissant
+    matches.sort(key=lambda x: x["score"], reverse=True)
+
+    return {"matches": matches[:limit]}
+```
+
+**Nouveau parametre `rlm_grep`** :
+
+```python
+@mcp.tool()
+def rlm_grep(
+    pattern: str,
+    limit: int = 10,
+    fuzzy: bool = False,        # NOUVEAU
+    fuzzy_threshold: int = 80,  # NOUVEAU
+    project: str = "",
+    domain: str = ""
+) -> str:
+    """
+    Search pattern across chunks.
+
+    Args:
+        pattern: Regex pattern OR text (if fuzzy=True)
+        limit: Max results
+        fuzzy: Enable fuzzy matching (tolerates typos)
+        fuzzy_threshold: Min similarity score 0-100 (default 80)
+        project: Filter by project
+        domain: Filter by domain
+    """
+    if fuzzy:
+        return grep_fuzzy(pattern, fuzzy_threshold, limit)
+    else:
+        return grep_exact(pattern, limit, project, domain)
+```
+
+**Exemples d'usage** :
+
+```python
+# Recherche exacte (actuel)
+rlm_grep("business plan")
+
+# Recherche fuzzy (nouveau)
+rlm_grep("buisness plan", fuzzy=True)  # Trouve "business plan"
+rlm_grep("validaton", fuzzy=True)       # Trouve "validation"
+rlm_grep("scenario", fuzzy=True, fuzzy_threshold=70)  # Plus tolerant
+```
+
+---
+
+#### 5.2.2 Multi-pattern (AND/OR)
+
+**Objectif** : Chercher plusieurs termes simultanement.
+
+```python
+def grep_multi(
+    patterns: list[str],
+    mode: str = "AND",  # "AND" ou "OR"
+    limit: int = 10
+) -> dict:
+    """
+    Multi-pattern grep.
+
+    AND mode: Toutes les patterns doivent matcher
+    OR mode: Au moins une pattern doit matcher
+    """
+    matches = []
+
+    for chunk_file in CHUNKS_DIR.glob("*.md"):
+        content = chunk_file.read_text().lower()
+
+        if mode == "AND":
+            if all(p.lower() in content for p in patterns):
+                matches.append({"chunk_id": chunk_file.stem})
+        else:  # OR
+            if any(p.lower() in content for p in patterns):
+                matches.append({"chunk_id": chunk_file.stem})
+
+    return {"matches": matches[:limit]}
+```
+
+**Syntaxe proposee** :
+
+```python
+rlm_grep("business AND plan")      # Les deux termes
+rlm_grep("odoo OR erp")            # L'un ou l'autre
+rlm_grep("joy juice NOT tunisie")  # Exclusion (P2)
+```
+
+---
+
+#### 5.2.3 Scoring et Ranking
+
+**Objectif** : Trier les resultats grep par pertinence (comme BM25).
+
+```python
+def grep_scored(pattern: str, limit: int = 10) -> dict:
+    """
+    Grep avec scoring de pertinence.
+
+    Score = nombre d'occurrences * position bonus
+    """
+    matches = []
+
+    for chunk_file in CHUNKS_DIR.glob("*.md"):
+        content = chunk_file.read_text()
+        occurrences = len(re.findall(pattern, content, re.IGNORECASE))
+
+        if occurrences > 0:
+            # Bonus si match dans le summary (debut du fichier)
+            summary_match = 1.5 if pattern.lower() in content[:200].lower() else 1.0
+            score = occurrences * summary_match
+
+            matches.append({
+                "chunk_id": chunk_file.stem,
+                "occurrences": occurrences,
+                "score": score
+            })
+
+    matches.sort(key=lambda x: x["score"], reverse=True)
+    return {"matches": matches[:limit]}
+```
+
+---
+
+#### 5.2.4 Tests de validation
+
+```python
+# tests/test_grep_fuzzy.py
+
+def test_fuzzy_finds_typos():
+    """Fuzzy grep trouve malgre les typos."""
+    # Setup: chunk avec "validation"
+    create_chunk("test_001", "La validation du process est complete.")
+
+    # Typo dans la recherche
+    result = grep_fuzzy("validaton", threshold=80)
+    assert len(result["matches"]) >= 1
+    assert result["matches"][0]["chunk_id"] == "test_001"
+
+def test_fuzzy_threshold():
+    """Le threshold controle la tolerance."""
+    create_chunk("test_002", "Configuration du systeme.")
+
+    # Threshold eleve = strict
+    result_strict = grep_fuzzy("config", threshold=90)
+    # Threshold bas = tolerant
+    result_tolerant = grep_fuzzy("konfig", threshold=60)
+
+    assert len(result_tolerant["matches"]) >= len(result_strict["matches"])
+
+def test_multi_pattern_and():
+    """AND mode requiert tous les termes."""
+    create_chunk("test_003", "Business plan Joy Juice 2026")
+    create_chunk("test_004", "Business meeting notes")
+
+    result = grep_multi(["business", "juice"], mode="AND")
+    assert "test_003" in [m["chunk_id"] for m in result["matches"]]
+    assert "test_004" not in [m["chunk_id"] for m in result["matches"]]
+```
+
+---
+
+#### 5.2.5 Dependances
+
+```toml
+# pyproject.toml
+[project.optional-dependencies]
+fuzzy = ["thefuzz>=0.22.1"]
+all = ["mcp-rlm-server[search,fuzzy,dev]"]
+```
+
+**Note** : `thefuzz` est pure Python, pas de dependance C.
+Alternative si performance critique : `rapidfuzz` (Cython, 10x plus rapide).
+
+---
+
+#### 5.2.6 Checklist Phase 5.2
+
+| Tache | Priorite | Statut |
+|-------|----------|--------|
+| Ajouter dependance `thefuzz` | P0 | FAIT |
+| Implementer `grep_fuzzy()` | P0 | FAIT |
+| Ajouter params `fuzzy` a `rlm_grep` | P0 | FAIT |
+| Tests fuzzy matching | P0 | FAIT (16 tests) |
+| Implementer multi-pattern (AND/OR) | P1 | A FAIRE |
+| Implementer scoring | P2 | FAIT (score dans resultats) |
+| Documentation usage | P1 | FAIT |
+
+**Complete en 1 session (2026-01-19)**
+
+---
 
 ### 5.3 Sub-agents Paralleles - FAIT
 
@@ -134,15 +381,850 @@ def auto_summarize(content: str, max_tokens: int = 200) -> str:
 - Detection auto projet via git root ou cwd
 - Portabilite : domains.json/sessions.json sont locaux (git-ignored)
 
-### 5.6 Export et backup
+### 5.6 Retention (Gestion du cycle de vie) - A FAIRE
+
+**Objectif** : Eviter l'accumulation infinie de chunks avec archivage intelligent et purge automatique.
+
+**Pourquoi maintenant** :
+- 17 chunks en une demi-journee → 100+ en quelques jours d'usage intensif
+- Sans retention, le grep/search devient lent et bruite
+- Besoin de garder les chunks importants et archiver/purger les autres
+
+---
+
+#### 5.6.1 Architecture 3 Zones
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    ZONE 1 : ACTIFS                           │
+│  context/chunks/*.md                                         │
+│  - Cherchables via rlm_grep / rlm_search                    │
+│  - Compteur d'acces actif                                   │
+│  - Pas de limite de taille                                  │
+└─────────────────────────────────────────────────────────────┘
+                          │
+                          │ Regles d'archivage (voir 5.6.2)
+                          ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    ZONE 2 : ARCHIVES                         │
+│  context/archive/*.md.gz (gzip)                             │
+│  - Toujours cherchables (decompression lazy)                │
+│  - Restauration auto si rlm_peek                            │
+│  - Compression ~70% reduction taille                        │
+└─────────────────────────────────────────────────────────────┘
+                          │
+                          │ 180 jours en archive sans acces
+                          ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    ZONE 3 : PURGES                           │
+│  Suppression definitive                                      │
+│  - Log conserve : date, summary, tags (pas le contenu)      │
+│  - context/purge_log.json                                   │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+#### 5.6.2 Regles d'Archivage
+
+Un chunk est **candidat a l'archivage** si :
+- Age > 30 jours depuis creation
+- `access_count == 0` (jamais consulte)
+- Pas d'immunite (voir 5.6.3)
+
+**Implementation** :
+
+```python
+from datetime import datetime, timedelta
+
+ARCHIVE_AFTER_DAYS = 30
+PURGE_AFTER_DAYS = 180
+
+def get_archive_candidates() -> list[dict]:
+    """Retourne les chunks candidats a l'archivage."""
+    index = load_index()
+    candidates = []
+    threshold = datetime.now() - timedelta(days=ARCHIVE_AFTER_DAYS)
+
+    for chunk in index["chunks"]:
+        created = datetime.fromisoformat(chunk["created"])
+        if (
+            created < threshold and
+            chunk.get("access_count", 0) == 0 and
+            not is_immune(chunk)
+        ):
+            candidates.append(chunk)
+
+    return candidates
+```
+
+---
+
+#### 5.6.3 Immunite Automatique
+
+Un chunk est **immune** (jamais archive/purge) si :
+
+| Condition | Justification |
+|-----------|---------------|
+| Tag `critical` ou `decision` | Marque explicite d'importance |
+| Tag `keep` ou `important` | Demande de conservation |
+| Contient "DECISION:" ou "IMPORTANT:" | Detection par contenu |
+| `access_count >= 3` | Chunk frequemment utilise |
+| Lie a un ticket non-ferme | Travail en cours (optionnel) |
+
+**Implementation** :
+
+```python
+PROTECTED_TAGS = {"critical", "decision", "keep", "important"}
+PROTECTED_KEYWORDS = ["DECISION:", "IMPORTANT:", "A RETENIR:"]
+
+def is_immune(chunk: dict) -> bool:
+    """Determine si un chunk est protege de l'archivage."""
+
+    # Tags protecteurs
+    chunk_tags = set(chunk.get("tags", []))
+    if chunk_tags & PROTECTED_TAGS:
+        return True
+
+    # Acces frequent
+    if chunk.get("access_count", 0) >= 3:
+        return True
+
+    # Contenu protecteur (necessite lecture du fichier)
+    chunk_file = CHUNKS_DIR / f"{chunk['id']}.md"
+    if chunk_file.exists():
+        content = chunk_file.read_text().upper()
+        if any(kw in content for kw in PROTECTED_KEYWORDS):
+            return True
+
+    return False
+```
+
+---
+
+#### 5.6.4 Compression Gzip
+
+```python
+import gzip
+import shutil
+
+def archive_chunk(chunk_id: str) -> bool:
+    """Archive un chunk (compression gzip)."""
+    src = CHUNKS_DIR / f"{chunk_id}.md"
+    dst = ARCHIVE_DIR / f"{chunk_id}.md.gz"
+
+    if not src.exists():
+        return False
+
+    ARCHIVE_DIR.mkdir(exist_ok=True)
+
+    # Compression
+    with open(src, 'rb') as f_in:
+        with gzip.open(dst, 'wb') as f_out:
+            shutil.copyfileobj(f_in, f_out)
+
+    # Supprimer original
+    src.unlink()
+
+    # Mettre a jour index
+    update_index_archived(chunk_id)
+
+    return True
+
+def restore_chunk(chunk_id: str) -> bool:
+    """Restaure un chunk archive."""
+    src = ARCHIVE_DIR / f"{chunk_id}.md.gz"
+    dst = CHUNKS_DIR / f"{chunk_id}.md"
+
+    if not src.exists():
+        return False
+
+    # Decompression
+    with gzip.open(src, 'rb') as f_in:
+        with open(dst, 'wb') as f_out:
+            shutil.copyfileobj(f_in, f_out)
+
+    # Supprimer archive
+    src.unlink()
+
+    # Mettre a jour index
+    update_index_restored(chunk_id)
+
+    return True
+```
+
+---
+
+#### 5.6.5 Nouveaux Tools MCP
+
+```python
+@mcp.tool()
+def rlm_retention_preview() -> str:
+    """
+    Preview retention actions without executing.
+
+    Shows what would be archived or purged based on current rules.
+    Use this to validate before running rlm_retention_run().
+    """
+    candidates = get_archive_candidates()
+    purge_candidates = get_purge_candidates()
+
+    output = "Retention Preview (dry-run)\n"
+    output += "=" * 40 + "\n\n"
+
+    output += f"Archive candidates ({len(candidates)}):\n"
+    for c in candidates[:10]:
+        output += f"  - {c['id']} ({c.get('summary', 'No summary')[:40]})\n"
+
+    output += f"\nPurge candidates ({len(purge_candidates)}):\n"
+    for c in purge_candidates[:10]:
+        output += f"  - {c['id']} (archived {c.get('archived_date', 'unknown')})\n"
+
+    return output
+
+@mcp.tool()
+def rlm_retention_run(archive: bool = True, purge: bool = False) -> str:
+    """
+    Execute retention actions.
+
+    Args:
+        archive: Archive old unused chunks (default: True)
+        purge: Purge very old archives (default: False, requires explicit)
+
+    Returns:
+        Summary of actions taken
+    """
+    results = {"archived": 0, "purged": 0, "errors": []}
+
+    if archive:
+        for chunk in get_archive_candidates():
+            try:
+                archive_chunk(chunk["id"])
+                results["archived"] += 1
+            except Exception as e:
+                results["errors"].append(f"{chunk['id']}: {e}")
+
+    if purge:
+        for chunk in get_purge_candidates():
+            try:
+                purge_chunk(chunk["id"])
+                results["purged"] += 1
+            except Exception as e:
+                results["errors"].append(f"{chunk['id']}: {e}")
+
+    return f"Retention complete: {results['archived']} archived, {results['purged']} purged"
+
+@mcp.tool()
+def rlm_restore(chunk_id: str) -> str:
+    """
+    Restore an archived chunk back to active storage.
+
+    Args:
+        chunk_id: ID of the archived chunk
+
+    Returns:
+        Confirmation message
+    """
+    if restore_chunk(chunk_id):
+        return f"Chunk {chunk_id} restored to active storage"
+    else:
+        return f"Chunk {chunk_id} not found in archives"
+```
+
+---
+
+#### 5.6.6 Auto-restore sur Peek
+
+Quand on fait `rlm_peek` sur un chunk archive, il est automatiquement restaure :
+
+```python
+def peek(chunk_id: str, start: int = 0, end: int = -1) -> dict:
+    chunk_file = CHUNKS_DIR / f"{chunk_id}.md"
+
+    # Si pas dans actifs, chercher dans archives
+    if not chunk_file.exists():
+        archive_file = ARCHIVE_DIR / f"{chunk_id}.md.gz"
+        if archive_file.exists():
+            # Auto-restore
+            restore_chunk(chunk_id)
+        else:
+            return {"status": "error", "message": f"Chunk {chunk_id} not found"}
+
+    # ... reste du code peek normal
+```
+
+---
+
+#### 5.6.7 Structure Fichiers
+
+```
+context/
+├── chunks/              # Zone 1 - Actifs
+│   ├── 2026-01-18_001.md
+│   └── ...
+├── archive/             # Zone 2 - Archives (NOUVEAU)
+│   ├── 2025-12-01_001.md.gz
+│   └── ...
+├── index.json           # Index actifs
+├── archive_index.json   # Index archives (NOUVEAU)
+└── purge_log.json       # Log des purges (NOUVEAU)
+```
+
+---
+
+#### 5.6.8 Configuration
+
+```python
+# Dans mcp_server/tools/retention.py
+
+# Delais configurables
+ARCHIVE_AFTER_DAYS = 30    # Archiver apres 30 jours sans acces
+PURGE_AFTER_DAYS = 180     # Purger apres 180 jours en archive
+
+# Seuils
+MIN_ACCESS_FOR_IMMUNITY = 3  # Chunks accedes 3+ fois sont immunises
+
+# Tags proteges
+PROTECTED_TAGS = {"critical", "decision", "keep", "important"}
+```
+
+---
+
+#### 5.6.9 Tests de validation
+
+```python
+# tests/test_retention.py
+
+def test_archive_candidate_detection():
+    """Chunks vieux et non-accedes sont candidats."""
+    # Setup: chunk de 35 jours, jamais accede
+    create_old_chunk("old_001", days_ago=35, access_count=0)
+
+    candidates = get_archive_candidates()
+    assert "old_001" in [c["id"] for c in candidates]
+
+def test_immunity_by_tag():
+    """Chunks avec tag critical sont immunises."""
+    create_old_chunk("critical_001", days_ago=60, access_count=0, tags=["critical"])
+
+    candidates = get_archive_candidates()
+    assert "critical_001" not in [c["id"] for c in candidates]
+
+def test_immunity_by_access():
+    """Chunks frequemment accedes sont immunises."""
+    create_old_chunk("popular_001", days_ago=60, access_count=5)
+
+    candidates = get_archive_candidates()
+    assert "popular_001" not in [c["id"] for c in candidates]
+
+def test_archive_and_restore():
+    """Archivage puis restauration fonctionne."""
+    create_chunk("test_archive", "Contenu test")
+
+    # Archive
+    assert archive_chunk("test_archive")
+    assert not (CHUNKS_DIR / "test_archive.md").exists()
+    assert (ARCHIVE_DIR / "test_archive.md.gz").exists()
+
+    # Restore
+    assert restore_chunk("test_archive")
+    assert (CHUNKS_DIR / "test_archive.md").exists()
+    assert not (ARCHIVE_DIR / "test_archive.md.gz").exists()
+
+def test_auto_restore_on_peek():
+    """Peek sur archive declenche auto-restore."""
+    create_chunk("auto_restore", "Contenu auto")
+    archive_chunk("auto_restore")
+
+    # Peek devrait restaurer automatiquement
+    result = peek("auto_restore")
+    assert result["status"] == "ok"
+    assert (CHUNKS_DIR / "auto_restore.md").exists()
+```
+
+---
+
+#### 5.6.10 Checklist Phase 5.6
+
+| Tache | Priorite | Statut |
+|-------|----------|--------|
+| Creer `mcp_server/tools/retention.py` | P0 | A FAIRE |
+| Implementer `is_immune()` | P0 | A FAIRE |
+| Implementer `archive_chunk()` / `restore_chunk()` | P0 | A FAIRE |
+| Implementer `get_archive_candidates()` | P0 | A FAIRE |
+| Tool `rlm_retention_preview` | P0 | A FAIRE |
+| Tool `rlm_retention_run` | P0 | A FAIRE |
+| Tool `rlm_restore` | P0 | A FAIRE |
+| Auto-restore dans `peek()` | P1 | A FAIRE |
+| `archive_index.json` gestion | P1 | A FAIRE |
+| `purge_log.json` gestion | P2 | A FAIRE |
+| Tests complets | P0 | A FAIRE |
+| Documentation usage | P1 | A FAIRE |
+
+**Effort estime** : 2 sessions
+
+---
+
+### 5.7 Export et Import (Bonus)
 
 | Tache | Description | Priorite |
 |-------|-------------|----------|
 | Export JSON | Exporter toute la memoire en JSON | P3 |
-| Backup automatique | Sauvegarder periodiquement | P3 |
-| Import | Restaurer depuis backup | P3 |
+| Import | Restaurer depuis export | P3 |
+| Backup automatique | Sauvegarder periodiquement (cron) | P3 |
+
+**Note** : P3 = nice-to-have, pas requis pour MVP+.
 
 **Documentation complete** : `docs/PHASE5_PLAN.md`
+
+---
+
+## Phase 6 : Production-Ready (MVP+ Communaute)
+
+**Objectif** : Preparer RLM pour distribution publique et adoption communautaire.
+
+**Criteres de succes** :
+- Tests automatises avec coverage >= 80%
+- CI/CD fonctionnel (tests + lint sur chaque PR)
+- Publication PyPI : `uvx mcp-rlm-server` fonctionne
+- Documentation complete avec exemples
+- Zero regression sur features existantes
+
+---
+
+### 6.1 Tests Automatises - P0
+
+**Structure proposee** :
+
+```
+tests/
+├── conftest.py              # Fixtures (temp dirs, sample data)
+├── test_memory.py           # rlm_remember, rlm_recall, rlm_forget
+├── test_navigation.py       # rlm_chunk, rlm_peek, rlm_grep
+├── test_search.py           # rlm_search (BM25)
+├── test_sessions.py         # rlm_sessions, rlm_domains
+├── test_tokenizer.py        # tokenize_fr, normalize_accent
+└── integration/
+    └── test_mcp_server.py   # Tests end-to-end FastMCP
+```
+
+**Types de tests** :
+
+| Type | Couverture | Outils |
+|------|------------|--------|
+| Unit | Logique metier isolee | pytest, mocks |
+| Integration | Client-serveur in-memory | FastMCP Client |
+| Regression | Features existantes | pytest markers |
+
+**Exemples de tests critiques** :
+
+```python
+# test_memory.py
+def test_remember_recall_cycle():
+    """Insight cree puis retrouve."""
+    result = remember("Test insight", category="fact")
+    assert "created" in result
+
+    recalled = recall(query="Test")
+    assert len(recalled) >= 1
+
+# test_navigation.py
+def test_chunk_deduplication():
+    """Meme contenu = meme chunk (pas de doublon)."""
+    r1 = chunk("Contenu identique")
+    r2 = chunk("Contenu identique")
+    assert r1["chunk_id"] == r2["chunk_id"]
+
+# test_search.py
+def test_bm25_french_accents():
+    """'realiste' trouve 'réaliste'."""
+    chunk("Scenario realiste pour 2026", tags="test")
+    results = search("réaliste")
+    assert len(results) >= 1
+```
+
+**Dependances test** :
+
+```toml
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "pytest-cov>=4.0",
+]
+```
+
+---
+
+### 6.2 CI/CD GitHub Actions - P0
+
+**Fichier `.github/workflows/ci.yml`** :
+
+```yaml
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          pip install -e ".[dev]"
+
+      - name: Run tests
+        run: |
+          pytest --cov=mcp_server --cov-report=xml
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        with:
+          file: coverage.xml
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install ruff
+      - run: ruff check mcp_server/
+```
+
+**Badges README** :
+
+```markdown
+[![Tests](https://github.com/EncrEor/rlm-claude/actions/workflows/ci.yml/badge.svg)](https://github.com/EncrEor/rlm-claude/actions)
+[![Coverage](https://codecov.io/gh/EncrEor/rlm-claude/branch/main/graph/badge.svg)](https://codecov.io/gh/EncrEor/rlm-claude)
+[![PyPI](https://img.shields.io/pypi/v/mcp-rlm-server)](https://pypi.org/project/mcp-rlm-server/)
+```
+
+---
+
+### 6.3 Distribution PyPI - P1
+
+**Fichier `pyproject.toml`** (remplace requirements.txt) :
+
+```toml
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "mcp-rlm-server"
+version = "0.6.0"
+description = "Infinite memory for Claude Code - MCP server with auto-chunking"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+authors = [
+    { name = "Ahmed MAKNI", email = "ahmed@joyjuice.co" }
+]
+keywords = ["mcp", "claude", "memory", "llm", "context-management"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "mcp>=1.0.0,<2.0.0",
+    "pydantic>=2.0.0,<3.0.0",
+]
+
+[project.optional-dependencies]
+search = ["bm25s>=0.2.0"]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "pytest-cov>=4.0",
+    "ruff>=0.1.0",
+]
+all = ["mcp-rlm-server[search,dev]"]
+
+[project.scripts]
+mcp-rlm-server = "mcp_server.server:main"
+
+[project.urls]
+Homepage = "https://github.com/EncrEor/rlm-claude"
+Documentation = "https://github.com/EncrEor/rlm-claude#readme"
+Repository = "https://github.com/EncrEor/rlm-claude"
+Issues = "https://github.com/EncrEor/rlm-claude/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["mcp_server"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+```
+
+**Installation utilisateur** :
+
+```bash
+# Installation rapide (recommande)
+uvx mcp-rlm-server
+
+# Installation permanente
+pip install mcp-rlm-server
+
+# Avec recherche BM25
+pip install mcp-rlm-server[search]
+```
+
+**Publication** :
+
+```bash
+# Build
+python -m build
+
+# Test sur TestPyPI
+twine upload --repository testpypi dist/*
+
+# Publication finale
+twine upload dist/*
+```
+
+---
+
+### 6.4 Robustesse - P1
+
+**6.4.1 Logging systeme**
+
+```python
+# mcp_server/utils/logging.py
+import logging
+from pathlib import Path
+
+LOG_DIR = Path.home() / ".claude" / "rlm" / "logs"
+LOG_DIR.mkdir(parents=True, exist_ok=True)
+
+def setup_logging(level: str = "INFO"):
+    logging.basicConfig(
+        level=getattr(logging, level),
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        handlers=[
+            logging.FileHandler(LOG_DIR / "rlm.log"),
+            logging.StreamHandler()
+        ]
+    )
+    return logging.getLogger("rlm")
+```
+
+**6.4.2 Atomic file writes**
+
+```python
+# Remplacer les writes directs par :
+import tempfile
+import shutil
+
+def atomic_write(path: Path, content: str):
+    """Ecriture atomique (evite corruption si crash)."""
+    fd, tmp_path = tempfile.mkstemp(dir=path.parent)
+    try:
+        with os.fdopen(fd, 'w') as f:
+            f.write(content)
+        shutil.move(tmp_path, path)
+    except:
+        os.unlink(tmp_path)
+        raise
+```
+
+**6.4.3 Error handling centralise**
+
+```python
+# Exceptions custom
+class RLMError(Exception):
+    """Base exception for RLM."""
+    pass
+
+class ChunkNotFoundError(RLMError):
+    """Chunk ID does not exist."""
+    pass
+
+class InvalidPatternError(RLMError):
+    """Invalid regex pattern."""
+    pass
+
+# Usage dans tools
+try:
+    regex = re.compile(pattern)
+except re.error as e:
+    raise InvalidPatternError(f"Invalid regex: {e}")
+```
+
+---
+
+### 6.5 Documentation - P1
+
+**6.5.1 CHANGELOG.md** (retrospectif)
+
+```markdown
+# Changelog
+
+All notable changes to RLM are documented here.
+
+## [0.6.0] - 2026-01-18 - Phase 5.5 Multi-sessions
+
+### Added
+- `rlm_sessions` - List sessions by project/domain
+- `rlm_domains` - List available domains
+- New chunk ID format: `{date}_{project}_{seq}_{ticket}_{domain}`
+- Project auto-detection via git/cwd
+- Cross-session filtering in `rlm_grep` and `rlm_search`
+
+### Fixed
+- Session tracking now properly registers chunks (bugfix b691d9f)
+
+## [0.5.1] - 2026-01-18 - Phase 5.1 BM25
+
+### Added
+- `rlm_search` - BM25 ranking search
+- French/English tokenization with accent normalization
+- Zero-dependency tokenizer
+
+## [0.5.0] - 2026-01-18 - Phase 5.3 Sub-agents
+
+### Added
+- Skill `/rlm-parallel` for parallel chunk analysis
+- Pattern "Partition + Map" from MIT paper
+
+## [0.4.0] - 2026-01-18 - Phase 4 Production
+
+### Added
+- Auto-summarization when no summary provided
+- Duplicate detection via content hash
+- Access counting for chunks
+- Most-accessed chunks in `rlm_status`
+
+### Fixed
+- Hook Stop format (systemMessage instead of additionalContext)
+
+## [0.3.0] - 2026-01-18 - Phase 3 Auto-chunking
+
+### Added
+- Auto-chunking via Claude Code hooks
+- Skill `/rlm-analyze` for sub-agent analysis
+- `install.sh` one-command installation
+
+## [0.2.0] - 2026-01-18 - Phase 2 Navigation
+
+### Added
+- `rlm_chunk` - Save content to external chunk
+- `rlm_peek` - Read chunk content
+- `rlm_grep` - Search patterns across chunks
+- `rlm_list_chunks` - List available chunks
+
+## [0.1.0] - 2026-01-18 - Phase 1 Memory
+
+### Added
+- `rlm_remember` - Save insights
+- `rlm_recall` - Retrieve insights
+- `rlm_forget` - Delete insights
+- `rlm_status` - System status
+```
+
+**6.5.2 README badges et section Dev**
+
+Ajouter en haut du README :
+
+```markdown
+[![Tests](https://github.com/EncrEor/rlm-claude/actions/workflows/ci.yml/badge.svg)](https://github.com/EncrEor/rlm-claude/actions)
+[![Coverage](https://codecov.io/gh/EncrEor/rlm-claude/branch/main/graph/badge.svg)](https://codecov.io/gh/EncrEor/rlm-claude)
+[![PyPI](https://img.shields.io/pypi/v/mcp-rlm-server)](https://pypi.org/project/mcp-rlm-server/)
+[![Python](https://img.shields.io/pypi/pyversions/mcp-rlm-server)](https://pypi.org/project/mcp-rlm-server/)
+```
+
+Ajouter section Development :
+
+```markdown
+## Development
+
+### Setup
+
+git clone https://github.com/EncrEor/rlm-claude.git
+cd rlm-claude
+pip install -e ".[dev]"
+
+### Run tests
+
+pytest                          # All tests
+pytest --cov=mcp_server         # With coverage
+pytest -k "test_memory"         # Specific tests
+
+### Lint
+
+ruff check mcp_server/
+ruff format mcp_server/
+
+### Contributing
+
+1. Fork the repo
+2. Create feature branch
+3. Add tests for new features
+4. Run `pytest` and `ruff check`
+5. Submit PR
+```
+
+---
+
+### 6.6 Checklist MVP+ Release
+
+| Tache | Priorite | Statut |
+|-------|----------|--------|
+| Structure `tests/` avec conftest.py | P0 | A FAIRE |
+| Tests memory (remember/recall/forget) | P0 | A FAIRE |
+| Tests navigation (chunk/peek/grep) | P0 | A FAIRE |
+| Tests search (BM25, tokenizer) | P0 | A FAIRE |
+| Tests sessions | P0 | A FAIRE |
+| Coverage >= 80% | P0 | A FAIRE |
+| `.github/workflows/ci.yml` | P0 | A FAIRE |
+| `pyproject.toml` | P1 | A FAIRE |
+| Publication TestPyPI | P1 | A FAIRE |
+| Publication PyPI | P1 | A FAIRE |
+| `CHANGELOG.md` | P1 | A FAIRE |
+| Badges README | P1 | A FAIRE |
+| Section Development README | P1 | A FAIRE |
+| Logging systeme | P2 | A FAIRE |
+| Atomic file writes | P2 | A FAIRE |
+| Error handling centralise | P2 | A FAIRE |
+
+---
+
+### Timeline estimee Phase 6
+
+| Sous-phase | Effort | Notes |
+|------------|--------|-------|
+| 6.1 Tests | 2 sessions | Structure + tests critiques |
+| 6.2 CI/CD | 1 session | GitHub Actions + Codecov |
+| 6.3 PyPI | 1 session | pyproject.toml + publication |
+| 6.4 Robustesse | 1 session | Optionnel pour MVP |
+| 6.5 Documentation | 1 session | CHANGELOG + README |
+
+**Total MVP+ : 5-6 sessions**
 
 ---
 

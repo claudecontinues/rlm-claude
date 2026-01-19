@@ -130,6 +130,7 @@ cp templates/skills/rlm-analyze/skill.md ~/.claude/skills/rlm-analyze/
 | `rlm_chunk` | Sauvegarder du contenu en chunk externe |
 | `rlm_peek` | Lire un chunk (ou portion par lignes) |
 | `rlm_grep` | Chercher un pattern regex dans tous les chunks |
+| `rlm_grep(..., fuzzy=True)` | **NEW v0.6.1** Recherche fuzzy tolerant les typos |
 | `rlm_list_chunks` | Lister les chunks disponibles avec metadonnees |
 
 ### Phase 5.1 - Search (BM25)
@@ -213,6 +214,11 @@ rlm_peek("2026-01-18_001")
 
 # Chercher dans l'historique (regex)
 rlm_grep("business plan")
+
+# Phase 5.2: Recherche fuzzy (tolere les typos)
+rlm_grep("buisness", fuzzy=True)           # → trouve "business"
+rlm_grep("validaton", fuzzy=True)          # → trouve "validation"
+rlm_grep("senario", fuzzy=True, fuzzy_threshold=70)  # Plus tolerant
 
 # Phase 5.5c: Filtrer par projet/domaine
 rlm_grep("equipment", project="JoyJuice", domain="bp")
@@ -422,10 +428,11 @@ ls ~/.claude/skills/rlm-analyze/
 - [x] **Phase 4** : Production (auto-summary, dedup, access tracking)
 - [ ] **Phase 5** : Avance
   - [x] 5.1 : BM25 search (rlm_search)
-  - [ ] 5.2 : Fuzzy grep
+  - [x] **5.2 : Fuzzy grep** (v0.6.1 - tolere typos)
   - [x] 5.3 : Sub-agents paralleles (/rlm-parallel)
-  - [x] **5.5 : Multi-sessions** (sessions, domains, filtres project/domain)
+  - [x] 5.5 : Multi-sessions (sessions, domains, filtres project/domain)
   - [ ] 5.6 : Retention (archive/purge)
+- [ ] **Phase 6** : Production-Ready (tests, CI/CD, PyPI)
 
 Voir [ROADMAP.md](ROADMAP.md) pour les details.
 
@@ -464,4 +471,4 @@ MIT License - voir [LICENSE](LICENSE)
 
 ---
 
-**Derniere mise a jour** : 2026-01-18 (Phase 5.5 Multi-sessions COMPLETE)
+**Derniere mise a jour** : 2026-01-19 (Phase 5.2 Fuzzy Grep - v0.6.1)
