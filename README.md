@@ -73,63 +73,53 @@ cp templates/skills/rlm-analyze/skill.md ~/.claude/skills/rlm-analyze/
 
 ```
 +-------------------------------------------------------------------+
-|                  RLM - Architecture v0.8.0                         |
+|                  RLM - Architecture v0.9.0                         |
 +-------------------------------------------------------------------+
 |                                                                    |
-|  HOOKS CLAUDE CODE (3 hooks)                                      |
+|  HOOKS CLAUDE CODE (2 hooks)                                      |
 |  +--------------------------------------------------------------+ |
 |  | Hook "PreCompact" (AVANT /compact ou auto-compact)           | |
 |  |   -> pre_compact_chunk.py                                    | |
-|  |   -> Force chunk AVANT perte de contexte                     | |
-|  |   -> Message bloquant avec instructions                       | |
-|  +--------------------------------------------------------------+ |
-|  | Hook "Stop" (apres chaque reponse) - BACKUP                  | |
-|  |   -> auto_chunk_check.py - progressif + context-aware        | |
-|  |   -> 10/20/30 tours + contexte >= 55%                        | |
-|  |   -> 3 niveaux: doux / insistant / critique                  | |
+|  |   -> Cree un chunk automatique minimal                       | |
+|  |   -> Sauvegarde garantie avant perte de contexte             | |
 |  +--------------------------------------------------------------+ |
 |  | Hook "PostToolUse" (apres rlm_chunk)                         | |
-|  |   -> reset_chunk_counter.py remet compteur a 0               | |
+|  |   -> reset_chunk_counter.py (pour stats)                     | |
 |  +--------------------------------------------------------------+ |
 |                              |                                     |
 |                              v                                     |
-|  CLAUDE (avec triggers manuels)                                   |
-|    - Chunk aux moments cles: decision, fin tache, insight        |
-|    - Peut utiliser /rlm-analyze pour analyser d'anciens chunks   |
+|  UTILISATEUR + CLAUDE                                             |
+|    - User: "chunk ca", "garde en memoire", "rlm_remember"        |
+|    - Claude: Propose chunk aux moments cles                       |
+|    - Post-compact: Claude lit le chunk auto et enrichit          |
 |                              |                                     |
 |                              v                                     |
 |  MCP SERVER RLM (14 tools)                                        |
 |    - rlm_remember/recall/forget/status (insights)                |
 |    - rlm_chunk/peek/grep/list_chunks + search/sessions (nav)     |
 |    - rlm_retention_preview/run/restore (retention)               |
-|    - Stockage persistant dans ~/.claude/rlm/context/             |
+|    - Stockage persistant dans context/                           |
 |                                                                    |
 +-------------------------------------------------------------------+
 ```
 
-### Strategie de Chunking (v0.8.0)
+### Strategie de Chunking (v0.9.0)
 
-**Principe** : Chunk aux moments importants, pas sur des seuils arbitraires.
+**Principe** : L'utilisateur decide, le systeme sauvegarde automatiquement avant /compact.
 
-#### Hook PreCompact (PRINCIPAL)
+| Moment | Action | Declencheur |
+|--------|--------|-------------|
+| Instruction explicite | `rlm_chunk()` / `rlm_remember()` | Utilisateur |
+| Moment cle | Claude propose de chunker | Reflexe Claude |
+| `/compact` | Chunk automatique minimal | Hook PreCompact |
+| Post-compact | Claude lit et enrichit | Reflexe Claude |
 
-Avant `/compact` ou auto-compact → message obligatoire :
-```
-[🔄 COMPACT DÉTECTÉ - SAUVEGARDE OBLIGATOIRE]
-Le contexte va être compacté. AVANT de continuer:
-1. rlm_chunk() - Résumer les points clés
-2. rlm_remember() - Sauvegarder chaque décision
-```
+#### Hook PreCompact (SAUVEGARDE AUTO)
 
-#### Hook Stop (BACKUP - progressif + context-aware)
-
-| Seuil | Contexte | Message |
-|-------|----------|---------|
-| 10+ tours | >= 55% | 📝 Doux |
-| 20+ tours | >= 55% | ⚠️ Insistant |
-| 30+ tours | >= 55% | 🛑 Critique |
-
-**Note** : Si contexte < 55%, pas de reminder (conversation légère).
+Avant `/compact` ou auto-compact → chunk automatique cree :
+- Resume basique de la session
+- Tags: `auto,precompact`
+- Claude peut enrichir apres le compact
 
 #### Triggers Manuels (reflexe Claude)
 
@@ -401,25 +391,7 @@ Structure du fichier :
 
 Note : Vous pouvez utiliser n'importe quel domaine, meme s'il n'est pas dans la liste.
 
-### Seuils Auto-Chunking
-
-Dans `hooks/auto_chunk_check.py` :
-
-```python
-# Seuils progressifs (v0.8.0)
-TURNS_SOFT = 10       # Reminder doux
-TURNS_MEDIUM = 20     # Reminder insistant
-TURNS_HARD = 30       # Reminder critique
-
-# Condition contexte
-CONTEXT_THRESHOLD = 55  # Ne trigger que si contexte >= 55%
-
-# Seuils temps (backup)
-TIME_SOFT = 2700      # 45 minutes
-TIME_HARD = 5400      # 90 minutes
-```
-
-### Hooks Claude Code
+### Hooks Claude Code (v0.9.0)
 
 Dans `~/.claude/settings.json` :
 
@@ -442,12 +414,6 @@ Dans `~/.claude/settings.json` :
         }]
       }
     ],
-    "Stop": [{
-      "hooks": [{
-        "type": "command",
-        "command": "python3 ~/.claude/rlm/hooks/auto_chunk_check.py"
-      }]
-    }],
     "PostToolUse": [{
       "matcher": "mcp__rlm-server__rlm_chunk",
       "hooks": [{
@@ -460,8 +426,9 @@ Dans `~/.claude/settings.json` :
 ```
 
 **Notes** :
-- `PreCompact` supporte les matchers `manual` (commande /compact) et `auto` (auto-compact)
-- Le hook `Stop` ne supporte pas les matchers
+- `PreCompact` cree un chunk automatique avant /compact (manual ou auto)
+- Hook `Stop` supprime en v0.9.0 (pas de reminders automatiques)
+- L'utilisateur decide quand chunker, le systeme sauvegarde avant perte
 
 ---
 
@@ -546,4 +513,4 @@ MIT License - voir [LICENSE](LICENSE)
 
 ---
 
-**Derniere mise a jour** : 2026-01-24 (v0.8.0 - Hook PreCompact + Context-aware)
+**Derniere mise a jour** : 2026-01-24 (v0.9.0 - Systeme Simplifie User-Driven + Auto-Compact)

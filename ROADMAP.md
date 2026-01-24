@@ -1,7 +1,7 @@
 # RLM - Roadmap
 
 > Pistes futures pour RLM - Memoire infinie pour Claude Code
-> **Derniere MAJ** : 2026-01-19
+> **Derniere MAJ** : 2026-01-24 (v0.9.0 - Systeme Simplifie)
 
 ---
 
@@ -11,7 +11,7 @@
 |-------|--------|-------------|
 | **Phase 1** | VALIDEE | Memory tools (remember/recall/forget/status) |
 | **Phase 2** | VALIDEE | Navigation tools (chunk/peek/grep/list) |
-| **Phase 3** | VALIDEE | Auto-chunking + Skill /rlm-analyze |
+| **Phase 3** | VALIDEE (v0.9.0) | Auto-chunking simplifie (PreCompact + user-driven) |
 | **Phase 4** | VALIDEE | Production (auto-summary, dedup, access tracking) |
 | **Phase 5** | VALIDEE | Avance (BM25, fuzzy, multi-sessions, retention) |
 | **Phase 6** | EN COURS | Production-Ready (tests, CI/CD, PyPI) |

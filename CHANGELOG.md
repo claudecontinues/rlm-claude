@@ -12,37 +12,47 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ---
 
-## [0.8.0] - 2026-01-24 - Hook PreCompact + Context-aware
-
-### Added
-- `pre_compact_chunk.py` - Hook PreCompact qui force chunk AVANT /compact ou auto-compact
-- Context-awareness: Hook Stop ne se déclenche QUE si contexte >= 55%
-- Seuils progressifs: 10 (📝 doux) / 20 (⚠️ insistant) / 30 (🛑 critique) tours
-- Affichage du % de contexte dans les messages de reminder
-- Documentation triggers manuels (décision, fin tâche, insight, changement sujet)
+## [0.9.0] - 2026-01-24 - Système Simplifié (User-Driven + Auto-Compact)
 
 ### Changed
-- `auto_chunk_check.py` v3 - Lecture du contexte via stdin + seuils progressifs
-- Architecture hooks: PreCompact (principal) + Stop (backup) + PostToolUse (reset)
+- **BREAKING**: Suppression des reminders automatiques 10/20/30 tours
+- Hook Stop désactivé (plus de reminders intrusifs)
+- Hook PreCompact crée un chunk automatique AVANT /compact
+- Philosophie: L'utilisateur décide quand chunker, le système sauvegarde avant perte
 
-### Configuration
-```json
-{
-  "hooks": {
-    "PreCompact": [
-      {"matcher": "manual", "hooks": [...]},
-      {"matcher": "auto", "hooks": [...]}
-    ],
-    "Stop": [...],
-    "PostToolUse": [...]
-  }
-}
-```
+### Architecture Simplifiée
 
-### Philosophy
-- Chunk aux moments importants, pas sur des seuils arbitraires
-- PreCompact garantit la sauvegarde avant perte de contexte
-- Context-aware évite le bruit sur les petites conversations
+| Moment | Action | Déclencheur |
+|--------|--------|-------------|
+| Instruction explicite | `rlm_chunk()` ou `rlm_remember()` | Utilisateur ("garde ça", "chunk") |
+| Moment clé | Claude propose de chunker | Réflexe Claude (décision, fin tâche) |
+| `/compact` | Chunk automatique minimal | Hook PreCompact |
+| Post-compact | Claude lit et enrichit si besoin | Réflexe Claude |
+
+### Removed
+- Seuils 10/20/30 tours
+- Reminders "AUTO-CHUNK REQUIS"
+- Context-awareness (plus nécessaire sans reminders)
+
+### Why
+- Les hooks PreCompact ne peuvent PAS injecter de message dans le contexte Claude
+- Les reminders étaient souvent ignorés
+- Approche user-driven + sauvegarde automatique = plus simple et plus efficace
+
+---
+
+## [0.8.0] - 2026-01-24 - Hook PreCompact + Context-aware (DEPRECATED)
+
+> **Note**: Cette version a été remplacée par v0.9.0 le même jour après découverte
+> que les hooks PreCompact ne peuvent pas injecter de messages dans le contexte Claude.
+
+### Added
+- `pre_compact_chunk.py` - Hook PreCompact (message seulement, pas d'injection)
+- Context-awareness: Hook Stop ne se déclenche QUE si contexte >= 55%
+- Seuils progressifs: 10/20/30 tours
+
+### Deprecated
+- Cette approche ne fonctionne pas comme prévu
 
 ---
 

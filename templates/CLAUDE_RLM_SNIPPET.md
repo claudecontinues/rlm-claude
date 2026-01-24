@@ -1,32 +1,54 @@
-## RLM - MEMOIRE AUTOMATIQUE (OBLIGATOIRE)
+## RLM - MÉMOIRE PERSISTANTE
 
-### Auto-chunking automatique
+### Philosophie (v0.9.0)
 
-Quand tu vois "AUTO-CHUNK REQUIS" dans ton contexte, tu DOIS immediatement :
-1. Resumer les points IMPORTANTS de la conversation recente
-2. Appeler `rlm_chunk(resume, summary="Session du [date]", tags="auto,session")`
-3. Appeler `rlm_remember()` pour chaque decision cle prise
-4. **NE PAS demander permission** - c'est automatique
+L'utilisateur décide quand chunker. Le système sauvegarde automatiquement avant /compact.
 
-### Debut de session
+### Quand chunker (réflexe Claude)
 
-Au debut de chaque nouvelle session, appeler `rlm_status()` pour voir :
-- Combien d'insights en memoire
-- Combien de chunks stockes
-- Tokens totaux
+**Chunk proactivement quand :**
+- 🎯 Décision importante prise
+- ✅ Tâche terminée avec succès
+- 💡 Insight ou règle découverte
+- 🔄 Changement de sujet majeur
+- ⚠️ Bug corrigé (documenter la cause)
 
-### Analyser d'anciens chunks
+**Chunk sur instruction utilisateur :**
+- "garde ça en mémoire"
+- "chunk cette discussion"
+- "rlm_remember cette décision"
 
-Pour analyser un chunk sans le charger en contexte :
-```
-/rlm-analyze <chunk_id> "<question>"
-```
+### Sauvegarde automatique
 
-### Cette memoire est LA TIENNE
+Le hook PreCompact crée un chunk minimal avant chaque /compact.
+Après le compact, tu peux lire ce chunk et l'enrichir si nécessaire.
+
+### Début de session
+
+Appeler `rlm_status()` pour voir l'état de la mémoire.
+
+### Cette mémoire est LA TIENNE
 
 Tu n'as pas besoin de demander permission pour :
 - Chunker l'historique
 - Sauvegarder des insights
-- Consulter ta memoire
+- Consulter ta mémoire
 
 C'est ton outil personnel de gestion de contexte.
+
+### Commandes utiles
+
+```python
+# Sauvegarder un insight
+rlm_remember("contenu", category="decision", importance="high")
+
+# Chunker une discussion
+rlm_chunk("résumé de la discussion", summary="Session du 24/01", tags="session")
+
+# Chercher dans l'historique
+rlm_search("sujet")
+rlm_grep("pattern")
+
+# Voir l'état
+rlm_status()
+```

@@ -1,7 +1,7 @@
 # RLM - Contexte de Session
 
 > **Fichier de reprise** : A lire au debut de chaque session pour restaurer le contexte complet.
-> **Derniere MAJ** : 2026-01-19 (Phase 5.6 Retention complete - v0.7.0)
+> **Derniere MAJ** : 2026-01-24 (v0.9.0 - Systeme Simplifie)
 
 ---
 
@@ -70,9 +70,9 @@ RLM/
 │       ├── tokenizer_fr.py # Tokenization FR/EN (Phase 5.1)
 │       └── sessions.py     # sessions, domains (Phase 5.5)
 │
-├── hooks/                # Phase 3 - Auto-chunking
-│   ├── auto_chunk_check.py    # Hook Stop - detection
-│   └── reset_chunk_counter.py # Hook PostToolUse - reset
+├── hooks/                # Phase 3 - Auto-chunking (v0.9.0 simplifie)
+│   ├── pre_compact_chunk.py   # Hook PreCompact - chunk auto avant /compact
+│   └── reset_chunk_counter.py # Hook PostToolUse - stats
 │
 ├── templates/            # Templates pour installation
 │   ├── hooks_settings.json
@@ -126,24 +126,24 @@ RLM/
 
 **Validation** : Tous les tools testes avec succes dans une nouvelle session Claude Code.
 
-### Phase 3 : Auto-chunking & Sub-agents - VALIDEE (2026-01-18)
+### Phase 3 : Auto-chunking & Sub-agents - VALIDEE (2026-01-18) → SIMPLIFIE (v0.9.0)
 
 | Tache | Statut |
 |-------|--------|
-| Hook `auto_chunk_check.py` (detection) | OK |
-| Hook `reset_chunk_counter.py` (reset) | OK |
-| Template `hooks_settings.json` | OK |
+| Hook `pre_compact_chunk.py` (sauvegarde auto) | OK (v0.9.0) |
+| Hook `reset_chunk_counter.py` (stats) | OK |
+| Template `hooks_settings.json` | OK (v0.9.0 - sans Stop) |
 | Skill `/rlm-analyze` | OK |
-| Instructions `CLAUDE_RLM_SNIPPET.md` | OK |
+| Instructions `CLAUDE_RLM_SNIPPET.md` | OK (v0.9.0) |
 | Script `install.sh` | OK |
 | Documentation README.md mise a jour | OK |
 | ROADMAP.md | OK |
 
-**Nouveautes Phase 3** :
-- Auto-chunking 100% automatique via hooks Claude Code
-- Skill `/rlm-analyze` pour deleguer analyses a sub-agents
-- Installation en une commande (`./install.sh`)
-- Zero intervention humaine pour la gestion memoire
+**Evolution v0.9.0** :
+- **SUPPRIME** : Hook Stop avec reminders 10/20/30 tours
+- **AJOUTE** : Hook PreCompact cree chunk automatique avant /compact
+- Philosophie : L'utilisateur decide, le systeme sauvegarde avant perte
+- Claude propose de chunker aux moments cles (decision, fin tache, etc.)
 
 ### Phase 4 : Production - VALIDEE (2026-01-18)
 
@@ -338,14 +338,16 @@ Voir [ROADMAP.md](ROADMAP.md) pour les details.
 | `rlm_retention_run` | Executer archivage/purge | OK |
 | `rlm_restore` | Restaurer un chunk archive | OK |
 
-### Phase 3 - Auto-chunking & Skills
+### Phase 3 - Auto-chunking & Skills (v0.9.0)
 
 | Composant | Description | Statut |
 |-----------|-------------|--------|
-| Hook Stop | Detection auto-chunk (10 tours / 30 min) | OK |
+| Hook PreCompact | Chunk automatique avant /compact | OK (v0.9.0) |
 | Hook PostToolUse | Reset compteur apres chunk | OK |
 | Skill `/rlm-analyze` | Analyser 1 chunk avec sub-agent | OK |
 | Skill `/rlm-parallel` | Analyser 3 chunks en parallele + merger | OK |
+
+**Note v0.9.0** : Hook Stop supprime (plus de reminders automatiques)
 
 ---
 
@@ -360,9 +362,8 @@ Voir [ROADMAP.md](ROADMAP.md) pour les details.
 | Transport MCP | stdio | Compatible Claude Code natif |
 | Stockage | Fichiers JSON/MD | Simple, portable, versionnable |
 | Sub-agents | Task tool (skill) | $0, partageable, migrable |
-| Auto-chunking | Hooks Claude Code | Integration native |
-| Seuil tours | 10 | Balance frequence/pertinence |
-| Seuil temps | 30 min | Sessions longues |
+| Auto-chunking | Hook PreCompact | Sauvegarde avant /compact |
+| Chunking manuel | User-driven | L'utilisateur decide |
 
 ---
 
@@ -376,8 +377,8 @@ Voir [ROADMAP.md](ROADMAP.md) pour les details.
 | `mcp_server/tools/search.py` | BM25 search (Phase 5.1) |
 | `mcp_server/tools/sessions.py` | Sessions + domaines (Phase 5.5) |
 | `mcp_server/tools/retention.py` | Archive/restore/purge (Phase 5.6) |
-| `hooks/auto_chunk_check.py` | Detection auto-chunk |
-| `hooks/reset_chunk_counter.py` | Reset compteur |
+| `hooks/pre_compact_chunk.py` | Chunk auto avant /compact (v0.9.0) |
+| `hooks/reset_chunk_counter.py` | Stats compteur |
 | `templates/skills/rlm-analyze/skill.md` | Skill analyse 1 chunk |
 | `templates/skills/rlm-parallel/skill.md` | Skill analyse parallele (3 chunks) |
 | `context/session_memory.json` | Insights stockes |

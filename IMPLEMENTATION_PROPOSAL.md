@@ -1,8 +1,8 @@
 # Proposition d'Implémentation : RLM Maison pour Claude Code
 
-> **Version** : 2.2 (Mise à jour Phase 5.6 Retention)
-> **Date** : 2026-01-19
-> **Statut** : Production - Phase 5 complete, Phase 6 en cours
+> **Version** : 2.3 (v0.9.0 - Systeme Simplifie)
+> **Date** : 2026-01-24
+> **Statut** : Production - Systeme simplifie user-driven + auto-compact
 
 ---
 
@@ -429,12 +429,13 @@ Après analyse, **MCP Server + Hooks** est l'approche la plus puissante et pére
 
 ### 6.2 Quand déclencher le chunking
 
-**Décision** : Automatique via hook, tous les 5 tours OU à 60% contexte
+**Décision (v0.9.0)** : User-driven + auto-save avant /compact
 
 **Justification** :
-- Pas de friction pour l'utilisateur
-- Évite d'attendre trop longtemps
-- Le seuil de 60% est basé sur notre expérience de dégradation
+- L'utilisateur décide quand chunker (instruction explicite)
+- Claude propose aux moments clés (décision, fin tâche, insight)
+- Hook PreCompact sauvegarde automatiquement avant /compact
+- Plus de reminders automatiques (10/20/30 tours supprimés)
 
 ### 6.3 Profondeur de récursion
 
@@ -596,6 +597,6 @@ Tu disposes d'outils RLM pour naviguer dans le contexte étendu.
 
 ---
 
-**Version** : 2.2
-**Date** : 2026-01-19
-**Statut** : Production - Phase 5.6 Retention complete (v0.7.0)
+**Version** : 2.3
+**Date** : 2026-01-24
+**Statut** : Production - v0.9.0 Systeme Simplifie (user-driven + auto-compact)
