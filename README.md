@@ -282,6 +282,15 @@ cp templates/skills/rlm-parallel/skill.md ~/.claude/skills/rlm-parallel/
 
 Then configure hooks in `~/.claude/settings.json` (see above).
 
+## Uninstall
+
+```bash
+./uninstall.sh              # Interactive (choose to keep or delete data)
+./uninstall.sh --keep-data  # Remove RLM config, keep your chunks/insights
+./uninstall.sh --all        # Remove everything
+./uninstall.sh --dry-run    # Preview what would be removed
+```
+
 ---
 
 ## Troubleshooting
