@@ -23,14 +23,14 @@ import re
 import subprocess
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 # Phase 5.5: Session tracking
-from .sessions import register_session, add_chunk_to_session
+from .sessions import add_chunk_to_session, register_session
 
 # Phase 5.2: Fuzzy matching (optional dependency)
 try:
     from thefuzz import fuzz
+
     FUZZY_AVAILABLE = True
 except ImportError:
     FUZZY_AVAILABLE = False
@@ -46,6 +46,7 @@ INDEX_FILE = CONTEXT_DIR / "index.json"
 # =============================================================================
 # PHASE 5.5: Multi-sessions support
 # =============================================================================
+
 
 def _detect_project() -> str:
     """
@@ -66,10 +67,7 @@ def _detect_project() -> str:
     # 2. Git repository name
     try:
         result = subprocess.run(
-            ["git", "rev-parse", "--show-toplevel"],
-            capture_output=True,
-            text=True,
-            timeout=5
+            ["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True, timeout=5
         )
         if result.returncode == 0:
             return Path(result.stdout.strip()).name
@@ -106,7 +104,7 @@ def parse_chunk_id(chunk_id: str) -> dict:
             "project": None,
             "ticket": None,
             "domain": None,
-            "format": "1.0"
+            "format": "1.0",
         }
 
     elif len(parts) >= 3:
@@ -117,7 +115,7 @@ def parse_chunk_id(chunk_id: str) -> dict:
             "sequence": parts[2],
             "ticket": None,
             "domain": None,
-            "format": "2.0"
+            "format": "2.0",
         }
 
         # Parse optional parts (ticket or domain)
@@ -144,10 +142,10 @@ def _load_index() -> dict:
             "chunks": [],
             "total_chunks": 0,
             "total_tokens_estimate": 0,
-            "last_chunking": None
+            "last_chunking": None,
         }
 
-    with open(INDEX_FILE, "r", encoding="utf-8") as f:
+    with open(INDEX_FILE, encoding="utf-8") as f:
         data = json.load(f)
 
     # Migrate from v1 if needed
@@ -177,6 +175,7 @@ def _estimate_tokens(text: str) -> int:
 # PHASE 4: Auto-summarization, Deduplication, Access Tracking
 # =============================================================================
 
+
 def _auto_summarize(content: str, max_length: int = 100) -> str:
     """
     Generate automatic summary from content (Phase 4.1).
@@ -191,7 +190,7 @@ def _auto_summarize(content: str, max_length: int = 100) -> str:
     Returns:
         Generated summary string
     """
-    lines = [line.strip() for line in content.split('\n') if line.strip()]
+    lines = [line.strip() for line in content.split("\n") if line.strip()]
 
     if not lines:
         return "Empty content"
@@ -200,12 +199,12 @@ def _auto_summarize(content: str, max_length: int = 100) -> str:
     first_line = lines[0]
 
     # Skip markdown headers for better summary
-    if first_line.startswith('#'):
-        first_line = first_line.lstrip('#').strip()
+    if first_line.startswith("#"):
+        first_line = first_line.lstrip("#").strip()
 
     # Truncate if too long
     if len(first_line) > max_length:
-        return first_line[:max_length - 3] + "..."
+        return first_line[: max_length - 3] + "..."
 
     return first_line
 
@@ -224,7 +223,7 @@ def _content_hash(content: str) -> str:
         MD5 hash of normalized content (32 chars)
     """
     # Normalize: lowercase, collapse whitespace
-    normalized = ' '.join(content.lower().split())
+    normalized = " ".join(content.lower().split())
     return hashlib.md5(normalized.encode()).hexdigest()
 
 
@@ -267,11 +266,7 @@ def _increment_access(chunk_id: str) -> None:
     _save_index(index)
 
 
-def _generate_chunk_id(
-    project: str = None,
-    ticket: str = None,
-    domain: str = None
-) -> str:
+def _generate_chunk_id(project: str = None, ticket: str = None, domain: str = None) -> str:
     """
     Generate a unique chunk ID (Phase 5.5 enhanced).
 
@@ -294,8 +289,7 @@ def _generate_chunk_id(
 
     # Find existing chunks for today + project
     existing_today = [
-        c for c in index["chunks"]
-        if c["id"].startswith(today) and c.get("project") == project
+        c for c in index["chunks"] if c["id"].startswith(today) and c.get("project") == project
     ]
 
     sequence = len(existing_today) + 1
@@ -314,10 +308,10 @@ def _generate_chunk_id(
 def chunk(
     content: str,
     summary: str = "",
-    tags: Optional[list[str]] = None,
+    tags: list[str] | None = None,
     project: str = None,
     ticket: str = None,
-    domain: str = None
+    domain: str = None,
 ) -> dict:
     """
     Save content to an external chunk file.
@@ -356,7 +350,7 @@ def chunk(
             "status": "duplicate",
             "existing_chunk_id": existing["id"],
             "existing_summary": existing.get("summary", ""),
-            "message": f"Content already exists in chunk {existing['id']}"
+            "message": f"Content already exists in chunk {existing['id']}",
         }
 
     # Phase 4.1: Auto-generate summary if not provided
@@ -375,10 +369,10 @@ def chunk(
     header = f"""---
 id: {chunk_id}
 summary: {summary}
-tags: {', '.join(tags or [])}
+tags: {", ".join(tags or [])}
 project: {resolved_project}
-ticket: {ticket or ''}
-domain: {domain or ''}
+ticket: {ticket or ""}
+domain: {domain or ""}
 created_at: {datetime.now().isoformat()}
 tokens_estimate: {tokens}
 content_hash: {content_hash}
@@ -392,22 +386,24 @@ format_version: "2.0"
 
     # Update index
     index = _load_index()
-    index["chunks"].append({
-        "id": chunk_id,
-        "file": f"chunks/{chunk_id}.md",
-        "summary": summary,
-        "tags": tags or [],
-        "tokens_estimate": tokens,
-        "content_hash": content_hash,
-        "access_count": 0,
-        "last_accessed": None,
-        "created_at": datetime.now().isoformat(),
-        # Phase 5.5 fields
-        "project": resolved_project,
-        "ticket": ticket,
-        "domain": domain,
-        "format_version": "2.0"
-    })
+    index["chunks"].append(
+        {
+            "id": chunk_id,
+            "file": f"chunks/{chunk_id}.md",
+            "summary": summary,
+            "tags": tags or [],
+            "tokens_estimate": tokens,
+            "content_hash": content_hash,
+            "access_count": 0,
+            "last_accessed": None,
+            "created_at": datetime.now().isoformat(),
+            # Phase 5.5 fields
+            "project": resolved_project,
+            "ticket": ticket,
+            "domain": domain,
+            "format_version": "2.0",
+        }
+    )
     index["total_tokens_estimate"] = sum(c["tokens_estimate"] for c in index["chunks"])
     _save_index(index)
 
@@ -423,7 +419,7 @@ format_version: "2.0"
             project=resolved_project,
             path=str(Path.cwd()),
             domain=domain or "",
-            ticket=ticket or ""
+            ticket=ticket or "",
         )
         add_chunk_to_session(chunk_id, session_id)
 
@@ -432,15 +428,11 @@ format_version: "2.0"
         "chunk_id": chunk_id,
         "tokens_estimate": tokens,
         "summary": summary,
-        "message": f"Chunk {chunk_id} created ({tokens} tokens estimated)"
+        "message": f"Chunk {chunk_id} created ({tokens} tokens estimated)",
     }
 
 
-def peek(
-    chunk_id: str,
-    start: int = 0,
-    end: Optional[int] = None
-) -> dict:
+def peek(chunk_id: str, start: int = 0, end: int | None = None) -> dict:
     """
     Read content from a chunk file.
 
@@ -467,25 +459,23 @@ def peek(
             # Auto-restore from archive
             try:
                 from .retention import restore_chunk
+
                 result = restore_chunk(chunk_id)
                 if result["status"] != "restored":
                     return {
                         "status": "error",
-                        "message": f"Failed to restore {chunk_id} from archive: {result['message']}"
+                        "message": f"Failed to restore {chunk_id} from archive: {result['message']}",
                     }
                 # Now chunk_file should exist
             except ImportError:
                 return {
                     "status": "error",
-                    "message": f"Chunk {chunk_id} is archived but retention module unavailable"
+                    "message": f"Chunk {chunk_id} is archived but retention module unavailable",
                 }
         else:
-            return {
-                "status": "not_found",
-                "message": f"Chunk {chunk_id} not found"
-            }
+            return {"status": "not_found", "message": f"Chunk {chunk_id} not found"}
 
-    with open(chunk_file, "r", encoding="utf-8") as f:
+    with open(chunk_file, encoding="utf-8") as f:
         lines = f.readlines()
 
     # Skip YAML header (find end of ---)
@@ -515,7 +505,7 @@ def peek(
         "chunk_id": chunk_id,
         "total_lines": len(content_lines),
         "showing_lines": f"{start}-{min(end, len(content_lines))}",
-        "content": "".join(selected_lines)
+        "content": "".join(selected_lines),
     }
 
 
@@ -526,7 +516,7 @@ def grep(
     project: str = None,
     domain: str = None,
     fuzzy: bool = False,
-    fuzzy_threshold: int = 80
+    fuzzy_threshold: int = 80,
 ) -> dict:
     """
     Search for a pattern across all chunks.
@@ -573,7 +563,7 @@ def grep(
         if not chunk_file.exists():
             continue
 
-        with open(chunk_file, "r", encoding="utf-8") as f:
+        with open(chunk_file, encoding="utf-8") as f:
             lines = f.readlines()
 
         # Skip YAML header
@@ -596,12 +586,14 @@ def grep(
                 end_ctx = min(len(content_lines), i + context_lines + 1)
                 context = "".join(content_lines[start_ctx:end_ctx])
 
-                matches.append({
-                    "chunk_id": chunk_info["id"],
-                    "chunk_summary": chunk_info.get("summary", ""),
-                    "line_number": i + 1,
-                    "context": context.strip()
-                })
+                matches.append(
+                    {
+                        "chunk_id": chunk_info["id"],
+                        "chunk_summary": chunk_info.get("summary", ""),
+                        "line_number": i + 1,
+                        "context": context.strip(),
+                    }
+                )
 
                 if len(matches) >= limit:
                     break
@@ -613,7 +605,7 @@ def grep(
         "status": "success",
         "pattern": pattern,
         "match_count": len(matches),
-        "matches": matches
+        "matches": matches,
     }
 
 
@@ -621,12 +613,9 @@ def grep(
 # PHASE 5.2: Fuzzy Search (Grep++)
 # =============================================================================
 
+
 def grep_fuzzy(
-    pattern: str,
-    threshold: int = 80,
-    limit: int = 10,
-    project: str = None,
-    domain: str = None
+    pattern: str, threshold: int = 80, limit: int = 10, project: str = None, domain: str = None
 ) -> dict:
     """
     Fuzzy grep - find matches even with typos (Phase 5.2).
@@ -647,7 +636,7 @@ def grep_fuzzy(
     if not FUZZY_AVAILABLE:
         return {
             "status": "error",
-            "message": "Fuzzy search requires thefuzz: pip install mcp-rlm-server[fuzzy]"
+            "message": "Fuzzy search requires thefuzz: pip install mcp-rlm-server[fuzzy]",
         }
 
     index = _load_index()
@@ -665,7 +654,7 @@ def grep_fuzzy(
         if not chunk_file.exists():
             continue
 
-        with open(chunk_file, "r", encoding="utf-8") as f:
+        with open(chunk_file, encoding="utf-8") as f:
             lines = f.readlines()
 
         # Skip YAML header
@@ -691,13 +680,15 @@ def grep_fuzzy(
             score = fuzz.partial_ratio(pattern.lower(), line_text.lower())
 
             if score >= threshold:
-                matches.append({
-                    "chunk_id": chunk_info["id"],
-                    "chunk_summary": chunk_info.get("summary", ""),
-                    "line_number": i + 1,
-                    "score": score,
-                    "context": line_text[:150]  # Truncate for readability
-                })
+                matches.append(
+                    {
+                        "chunk_id": chunk_info["id"],
+                        "chunk_summary": chunk_info.get("summary", ""),
+                        "line_number": i + 1,
+                        "score": score,
+                        "context": line_text[:150],  # Truncate for readability
+                    }
+                )
 
     # Sort by score (highest first)
     matches.sort(key=lambda x: x["score"], reverse=True)
@@ -708,7 +699,7 @@ def grep_fuzzy(
         "fuzzy": True,
         "threshold": threshold,
         "match_count": len(matches[:limit]),
-        "matches": matches[:limit]
+        "matches": matches[:limit],
     }
 
 
@@ -729,11 +720,7 @@ def list_chunks(limit: int = 20) -> dict:
     chunks = index.get("chunks", [])
 
     # Sort by creation date (newest first)
-    chunks_sorted = sorted(
-        chunks,
-        key=lambda x: x.get("created_at", ""),
-        reverse=True
-    )[:limit]
+    chunks_sorted = sorted(chunks, key=lambda x: x.get("created_at", ""), reverse=True)[:limit]
 
     return {
         "status": "success",
@@ -748,8 +735,10 @@ def list_chunks(limit: int = 20) -> dict:
                 "created": c.get("created_at", "")[:16],
                 # Phase 4.3: Access metrics
                 "access_count": c.get("access_count", 0),
-                "last_accessed": c.get("last_accessed", "")[:16] if c.get("last_accessed") else None
+                "last_accessed": c.get("last_accessed", "")[:16]
+                if c.get("last_accessed")
+                else None,
             }
             for c in chunks_sorted
-        ]
+        ],
     }

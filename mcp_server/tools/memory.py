@@ -6,12 +6,10 @@ and facts discovered during a conversation, enabling "infinite" memory
 by offloading to persistent storage.
 """
 
+import hashlib
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
-import hashlib
-
 
 # Path to session memory file (relative to RLM root)
 CONTEXT_DIR = Path(__file__).parent.parent.parent / "context"
@@ -27,11 +25,11 @@ def _load_memory() -> dict:
             "metadata": {
                 "created_at": datetime.now().isoformat(),
                 "last_updated": None,
-                "total_insights": 0
-            }
+                "total_insights": 0,
+            },
         }
 
-    with open(MEMORY_FILE, "r", encoding="utf-8") as f:
+    with open(MEMORY_FILE, encoding="utf-8") as f:
         return json.load(f)
 
 
@@ -55,7 +53,7 @@ def remember(
     content: str,
     category: str = "general",
     importance: str = "medium",
-    tags: Optional[list[str]] = None
+    tags: list[str] | None = None,
 ) -> dict:
     """
     Save an important insight to persistent memory.
@@ -83,7 +81,7 @@ def remember(
         "category": category,
         "importance": importance,
         "tags": tags or [],
-        "created_at": datetime.now().isoformat()
+        "created_at": datetime.now().isoformat(),
     }
 
     memory["insights"].append(insight)
@@ -93,15 +91,15 @@ def remember(
         "status": "saved",
         "id": insight["id"],
         "message": f"Insight saved with ID {insight['id']}",
-        "total_insights": len(memory["insights"])
+        "total_insights": len(memory["insights"]),
     }
 
 
 def recall(
-    query: Optional[str] = None,
-    category: Optional[str] = None,
-    importance: Optional[str] = None,
-    limit: int = 10
+    query: str | None = None,
+    category: str | None = None,
+    importance: str | None = None,
+    limit: int = 10,
 ) -> dict:
     """
     Retrieve insights from memory.
@@ -136,7 +134,8 @@ def recall(
     if query:
         query_lower = query.lower()
         insights = [
-            i for i in insights
+            i
+            for i in insights
             if query_lower in i["content"].lower()
             or any(query_lower in tag.lower() for tag in i.get("tags", []))
         ]
@@ -148,7 +147,7 @@ def recall(
         "status": "success",
         "count": len(insights),
         "total_in_memory": memory["metadata"]["total_insights"],
-        "insights": insights
+        "insights": insights,
     }
 
 
@@ -168,17 +167,14 @@ def forget(insight_id: str) -> dict:
     memory["insights"] = [i for i in memory["insights"] if i["id"] != insight_id]
 
     if len(memory["insights"]) == original_count:
-        return {
-            "status": "not_found",
-            "message": f"No insight found with ID {insight_id}"
-        }
+        return {"status": "not_found", "message": f"No insight found with ID {insight_id}"}
 
     _save_memory(memory)
 
     return {
         "status": "deleted",
         "message": f"Insight {insight_id} removed from memory",
-        "remaining_insights": len(memory["insights"])
+        "remaining_insights": len(memory["insights"]),
     }
 
 
@@ -210,5 +206,5 @@ def memory_status() -> dict:
         "by_category": categories,
         "by_importance": importance_counts,
         "created_at": memory["metadata"]["created_at"],
-        "last_updated": memory["metadata"]["last_updated"]
+        "last_updated": memory["metadata"]["last_updated"],
     }

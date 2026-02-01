@@ -16,10 +16,8 @@ Retention Rules:
 
 import gzip
 import json
-import shutil
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Optional
 
 # Paths - same base as navigation.py
 CONTEXT_DIR = Path(__file__).parent.parent.parent / "context"
@@ -33,8 +31,8 @@ PURGE_LOG_FILE = CONTEXT_DIR / "purge_log.json"
 # CONFIGURATION
 # =============================================================================
 
-ARCHIVE_AFTER_DAYS = 30      # Archive after 30 days if unused
-PURGE_AFTER_DAYS = 180       # Purge after 180 days in archive
+ARCHIVE_AFTER_DAYS = 30  # Archive after 30 days if unused
+PURGE_AFTER_DAYS = 180  # Purge after 180 days in archive
 
 MIN_ACCESS_FOR_IMMUNITY = 3  # 3+ accesses = protected from archiving
 
@@ -46,6 +44,7 @@ PROTECTED_KEYWORDS = ["DECISION:", "IMPORTANT:", "A RETENIR:", "CRITICAL:"]
 # INDEX MANAGEMENT
 # =============================================================================
 
+
 def _load_index() -> dict:
     """Load chunks index from JSON file."""
     if not INDEX_FILE.exists():
@@ -55,7 +54,7 @@ def _load_index() -> dict:
             "chunks": [],
         }
 
-    with open(INDEX_FILE, "r", encoding="utf-8") as f:
+    with open(INDEX_FILE, encoding="utf-8") as f:
         return json.load(f)
 
 
@@ -76,7 +75,7 @@ def _load_archive_index() -> dict:
             "archives": [],
         }
 
-    with open(ARCHIVE_INDEX_FILE, "r", encoding="utf-8") as f:
+    with open(ARCHIVE_INDEX_FILE, encoding="utf-8") as f:
         return json.load(f)
 
 
@@ -97,7 +96,7 @@ def _load_purge_log() -> dict:
             "purged": [],
         }
 
-    with open(PURGE_LOG_FILE, "r", encoding="utf-8") as f:
+    with open(PURGE_LOG_FILE, encoding="utf-8") as f:
         return json.load(f)
 
 
@@ -112,6 +111,7 @@ def _save_purge_log(purge_log: dict) -> None:
 # =============================================================================
 # IMMUNITY DETECTION
 # =============================================================================
+
 
 def is_immune(chunk: dict) -> bool:
     """
@@ -129,7 +129,7 @@ def is_immune(chunk: dict) -> bool:
         True if chunk is immune, False otherwise
     """
     # Check protected tags
-    chunk_tags = set(t.lower() for t in chunk.get("tags", []))
+    chunk_tags = {t.lower() for t in chunk.get("tags", [])}
     protected_lower = {t.lower() for t in PROTECTED_TAGS}
 
     if chunk_tags & protected_lower:
@@ -157,6 +157,7 @@ def is_immune(chunk: dict) -> bool:
 # =============================================================================
 # CANDIDATE DETECTION
 # =============================================================================
+
 
 def get_archive_candidates() -> list[dict]:
     """
@@ -257,6 +258,7 @@ def get_purge_candidates() -> list[dict]:
 # ARCHIVE OPERATIONS
 # =============================================================================
 
+
 def archive_chunk(chunk_id: str) -> dict:
     """
     Archive a chunk by compressing it to archive/.
@@ -277,10 +279,7 @@ def archive_chunk(chunk_id: str) -> dict:
     src_file = CHUNKS_DIR / f"{chunk_id}.md"
 
     if not src_file.exists():
-        return {
-            "status": "error",
-            "message": f"Chunk {chunk_id} not found in active storage"
-        }
+        return {"status": "error", "message": f"Chunk {chunk_id} not found in active storage"}
 
     # Ensure archive directory exists
     ARCHIVE_DIR.mkdir(parents=True, exist_ok=True)
@@ -289,10 +288,7 @@ def archive_chunk(chunk_id: str) -> dict:
 
     # Check if already archived
     if dst_file.exists():
-        return {
-            "status": "error",
-            "message": f"Chunk {chunk_id} already archived"
-        }
+        return {"status": "error", "message": f"Chunk {chunk_id} already archived"}
 
     try:
         # Read original content
@@ -345,17 +341,14 @@ def archive_chunk(chunk_id: str) -> dict:
             "original_size": original_size,
             "compressed_size": compressed_size,
             "compression_ratio": f"{compression_ratio:.1f}%",
-            "message": f"Chunk {chunk_id} archived ({compression_ratio:.1f}% compression)"
+            "message": f"Chunk {chunk_id} archived ({compression_ratio:.1f}% compression)",
         }
 
     except Exception as e:
         # Cleanup on error
         if dst_file.exists():
             dst_file.unlink()
-        return {
-            "status": "error",
-            "message": f"Failed to archive {chunk_id}: {str(e)}"
-        }
+        return {"status": "error", "message": f"Failed to archive {chunk_id}: {str(e)}"}
 
 
 def restore_chunk(chunk_id: str) -> dict:
@@ -378,19 +371,13 @@ def restore_chunk(chunk_id: str) -> dict:
     archive_file = ARCHIVE_DIR / f"{chunk_id}.md.gz"
 
     if not archive_file.exists():
-        return {
-            "status": "error",
-            "message": f"Chunk {chunk_id} not found in archives"
-        }
+        return {"status": "error", "message": f"Chunk {chunk_id} not found in archives"}
 
     dst_file = CHUNKS_DIR / f"{chunk_id}.md"
 
     # Check if already exists in active storage
     if dst_file.exists():
-        return {
-            "status": "error",
-            "message": f"Chunk {chunk_id} already exists in active storage"
-        }
+        return {"status": "error", "message": f"Chunk {chunk_id} already exists in active storage"}
 
     try:
         # Decompress
@@ -436,17 +423,14 @@ def restore_chunk(chunk_id: str) -> dict:
         return {
             "status": "restored",
             "chunk_id": chunk_id,
-            "message": f"Chunk {chunk_id} restored to active storage"
+            "message": f"Chunk {chunk_id} restored to active storage",
         }
 
     except Exception as e:
         # Cleanup on error
         if dst_file.exists() and not archive_file.exists():
             dst_file.unlink()
-        return {
-            "status": "error",
-            "message": f"Failed to restore {chunk_id}: {str(e)}"
-        }
+        return {"status": "error", "message": f"Failed to restore {chunk_id}: {str(e)}"}
 
 
 def purge_chunk(chunk_id: str) -> dict:
@@ -468,10 +452,7 @@ def purge_chunk(chunk_id: str) -> dict:
     archive_file = ARCHIVE_DIR / f"{chunk_id}.md.gz"
 
     if not archive_file.exists():
-        return {
-            "status": "error",
-            "message": f"Chunk {chunk_id} not found in archives"
-        }
+        return {"status": "error", "message": f"Chunk {chunk_id} not found in archives"}
 
     try:
         # Get archive metadata
@@ -508,19 +489,17 @@ def purge_chunk(chunk_id: str) -> dict:
         return {
             "status": "purged",
             "chunk_id": chunk_id,
-            "message": f"Chunk {chunk_id} permanently deleted (metadata logged)"
+            "message": f"Chunk {chunk_id} permanently deleted (metadata logged)",
         }
 
     except Exception as e:
-        return {
-            "status": "error",
-            "message": f"Failed to purge {chunk_id}: {str(e)}"
-        }
+        return {"status": "error", "message": f"Failed to purge {chunk_id}: {str(e)}"}
 
 
 # =============================================================================
 # MCP TOOL FUNCTIONS
 # =============================================================================
+
 
 def retention_preview() -> dict:
     """
@@ -619,6 +598,7 @@ def restore(chunk_id: str) -> dict:
 # UTILITY FUNCTIONS
 # =============================================================================
 
+
 def get_archive_stats() -> dict:
     """
     Get statistics about archived chunks.
@@ -636,7 +616,9 @@ def get_archive_stats() -> dict:
         "archive_count": len(archives),
         "total_original_size": total_original,
         "total_compressed_size": total_compressed,
-        "compression_ratio": f"{(1 - total_compressed / total_original) * 100:.1f}%" if total_original > 0 else "N/A",
+        "compression_ratio": f"{(1 - total_compressed / total_original) * 100:.1f}%"
+        if total_original > 0
+        else "N/A",
     }
 
 

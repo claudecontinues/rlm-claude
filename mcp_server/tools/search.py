@@ -13,17 +13,16 @@ Phase 5.5c: Added project/domain filtering.
 import json
 import re
 from pathlib import Path
-from typing import Optional
 
 # BM25S import with fallback
 try:
     import bm25s
+
     BM25_AVAILABLE = True
 except ImportError:
     BM25_AVAILABLE = False
 
 from .tokenizer_fr import tokenize_fr
-
 
 # Paths (same as navigation.py)
 CONTEXT_DIR = Path(__file__).parent.parent.parent / "context"
@@ -40,7 +39,7 @@ class RLMSearch:
     - Returns ranked results with scores
     """
 
-    def __init__(self, chunks_dir: Optional[Path] = None):
+    def __init__(self, chunks_dir: Path | None = None):
         """
         Initialize the search engine.
 
@@ -62,11 +61,11 @@ class RLMSearch:
         Returns:
             Content string without YAML header
         """
-        with open(chunk_file, "r", encoding="utf-8") as f:
+        with open(chunk_file, encoding="utf-8") as f:
             content = f.read()
 
         # Skip YAML header (between --- markers)
-        lines = content.split('\n')
+        lines = content.split("\n")
         content_start = 0
         in_header = False
 
@@ -78,7 +77,7 @@ class RLMSearch:
                     content_start = i + 1
                     break
 
-        return '\n'.join(lines[content_start:])
+        return "\n".join(lines[content_start:])
 
     def _extract_summary(self, chunk_file: Path) -> str:
         """
@@ -90,11 +89,11 @@ class RLMSearch:
         Returns:
             Summary string or empty string
         """
-        with open(chunk_file, "r", encoding="utf-8") as f:
+        with open(chunk_file, encoding="utf-8") as f:
             content = f.read()
 
         # Find summary in YAML header
-        match = re.search(r'^summary:\s*(.+)$', content, re.MULTILINE)
+        match = re.search(r"^summary:\s*(.+)$", content, re.MULTILINE)
         if match:
             return match.group(1).strip()
         return ""
@@ -110,9 +109,7 @@ class RLMSearch:
             Number of chunks indexed
         """
         if not BM25_AVAILABLE:
-            raise ImportError(
-                "bm25s is required for search. Install with: pip install bm25s"
-            )
+            raise ImportError("bm25s is required for search. Install with: pip install bm25s")
 
         documents = []
         self.chunk_ids = []
@@ -152,9 +149,7 @@ class RLMSearch:
             List of dicts with chunk_id, score, and summary
         """
         if not BM25_AVAILABLE:
-            raise ImportError(
-                "bm25s is required for search. Install with: pip install bm25s"
-            )
+            raise ImportError("bm25s is required for search. Install with: pip install bm25s")
 
         # Build index if not already done
         if self.retriever is None:
@@ -174,24 +169,21 @@ class RLMSearch:
 
         # Format results
         output = []
-        for i, (idx, score) in enumerate(zip(results[0], scores[0])):
+        for _i, (idx, score) in enumerate(zip(results[0], scores[0], strict=False)):
             if score > 0:  # Only include positive scores
                 chunk_id = self.chunk_ids[idx]
-                output.append({
-                    "chunk_id": chunk_id,
-                    "score": float(score),
-                    "summary": self.chunk_summaries.get(chunk_id, "")
-                })
+                output.append(
+                    {
+                        "chunk_id": chunk_id,
+                        "score": float(score),
+                        "summary": self.chunk_summaries.get(chunk_id, ""),
+                    }
+                )
 
         return output
 
 
-def search(
-    query: str,
-    limit: int = 5,
-    project: str = None,
-    domain: str = None
-) -> dict:
+def search(query: str, limit: int = 5, project: str = None, domain: str = None) -> dict:
     """
     Convenience function for searching chunks.
 
@@ -212,18 +204,14 @@ def search(
         # Get more results than needed for filtering
         results = searcher.search(query, top_k=limit * 3)
     except ImportError as e:
-        return {
-            "status": "error",
-            "message": str(e),
-            "results": []
-        }
+        return {"status": "error", "message": str(e), "results": []}
 
     # Phase 5.5c: Filter by project/domain if specified
     if project or domain:
         # Load index to get chunk metadata
         index_file = CONTEXT_DIR / "index.json"
         if index_file.exists():
-            with open(index_file, "r", encoding="utf-8") as f:
+            with open(index_file, encoding="utf-8") as f:
                 index = json.load(f)
 
             # Build lookup for project/domain
@@ -247,7 +235,7 @@ def search(
         "query": query,
         "result_count": len(results),
         "filters": {"project": project, "domain": domain} if (project or domain) else None,
-        "results": results
+        "results": results,
     }
 
 

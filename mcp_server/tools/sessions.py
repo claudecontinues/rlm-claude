@@ -6,9 +6,8 @@ Sessions group chunks by working context (project/domain/ticket).
 """
 
 import json
-from pathlib import Path
 from datetime import datetime
-from typing import Optional
+from pathlib import Path
 
 # Paths
 CONTEXT_DIR = Path(__file__).parent.parent.parent / "context"
@@ -19,13 +18,9 @@ DOMAINS_FILE = CONTEXT_DIR / "domains.json"
 def _load_sessions() -> dict:
     """Load sessions index from disk."""
     if not SESSIONS_FILE.exists():
-        return {
-            "version": "1.0.0",
-            "current_session": None,
-            "sessions": {}
-        }
+        return {"version": "1.0.0", "current_session": None, "sessions": {}}
 
-    with open(SESSIONS_FILE, "r", encoding="utf-8") as f:
+    with open(SESSIONS_FILE, encoding="utf-8") as f:
         return json.load(f)
 
 
@@ -45,13 +40,23 @@ def _load_domains() -> dict:
             "default": {
                 "description": "Generic domains for any project",
                 "list": [
-                    "dev", "research", "planning", "debug", "test",
-                    "docs", "review", "deploy", "feature", "bugfix",
-                    "refactor", "meeting", "decision"
-                ]
+                    "dev",
+                    "research",
+                    "planning",
+                    "debug",
+                    "test",
+                    "docs",
+                    "review",
+                    "deploy",
+                    "feature",
+                    "bugfix",
+                    "refactor",
+                    "meeting",
+                    "decision",
+                ],
             }
         },
-        "_note": "Customize this file for your project. See domains.json.example for an extended example."
+        "_note": "Customize this file for your project. See domains.json.example for an extended example.",
     }
 
     if not DOMAINS_FILE.exists():
@@ -61,11 +66,11 @@ def _load_domains() -> dict:
             json.dump(default_domains, f, indent=2, ensure_ascii=False)
         return default_domains
 
-    with open(DOMAINS_FILE, "r", encoding="utf-8") as f:
+    with open(DOMAINS_FILE, encoding="utf-8") as f:
         return json.load(f)
 
 
-def get_current_session() -> Optional[str]:
+def get_current_session() -> str | None:
     """Get the current active session ID."""
     data = _load_sessions()
     return data.get("current_session")
@@ -85,7 +90,7 @@ def register_session(
     path: str = "",
     domain: str = "",
     ticket: str = "",
-    tags: list = None
+    tags: list = None,
 ) -> dict:
     """
     Register a new session in the index.
@@ -107,7 +112,7 @@ def register_session(
         return {
             "status": "exists",
             "message": f"Session {session_id} already exists",
-            "session": data["sessions"][session_id]
+            "session": data["sessions"][session_id],
         }
 
     session = {
@@ -117,18 +122,14 @@ def register_session(
         "ticket": ticket,
         "started": datetime.now().isoformat(),
         "chunks": [],
-        "tags": tags or []
+        "tags": tags or [],
     }
 
     data["sessions"][session_id] = session
     data["current_session"] = session_id
     _save_sessions(data)
 
-    return {
-        "status": "created",
-        "message": f"Session {session_id} created",
-        "session": session
-    }
+    return {"status": "created", "message": f"Session {session_id} created", "session": session}
 
 
 def add_chunk_to_session(chunk_id: str, session_id: str = None) -> dict:
@@ -147,16 +148,10 @@ def add_chunk_to_session(chunk_id: str, session_id: str = None) -> dict:
     target_session = session_id or data.get("current_session")
 
     if not target_session:
-        return {
-            "status": "no_session",
-            "message": "No active session. Create one first."
-        }
+        return {"status": "no_session", "message": "No active session. Create one first."}
 
     if target_session not in data["sessions"]:
-        return {
-            "status": "not_found",
-            "message": f"Session {target_session} not found"
-        }
+        return {"status": "not_found", "message": f"Session {target_session} not found"}
 
     if chunk_id not in data["sessions"][target_session]["chunks"]:
         data["sessions"][target_session]["chunks"].append(chunk_id)
@@ -165,15 +160,11 @@ def add_chunk_to_session(chunk_id: str, session_id: str = None) -> dict:
     return {
         "status": "ok",
         "session": target_session,
-        "chunk_count": len(data["sessions"][target_session]["chunks"])
+        "chunk_count": len(data["sessions"][target_session]["chunks"]),
     }
 
 
-def list_sessions(
-    project: str = None,
-    domain: str = None,
-    limit: int = 10
-) -> dict:
+def list_sessions(project: str = None, domain: str = None, limit: int = 10) -> dict:
     """
     List available sessions with optional filtering.
 
@@ -195,10 +186,7 @@ def list_sessions(
             continue
         if domain and session.get("domain") != domain:
             continue
-        filtered.append({
-            "id": sid,
-            **session
-        })
+        filtered.append({"id": sid, **session})
 
     # Sort by started date (most recent first)
     filtered.sort(key=lambda x: x.get("started", ""), reverse=True)
@@ -208,7 +196,7 @@ def list_sessions(
         "total": len(filtered),
         "showing": min(limit, len(filtered)),
         "current_session": data.get("current_session"),
-        "sessions": filtered[:limit]
+        "sessions": filtered[:limit],
     }
 
 
@@ -225,10 +213,7 @@ def list_domains() -> dict:
     all_domains = []
     for category, info in data.get("domains", {}).items():
         for domain in info.get("list", []):
-            all_domains.append({
-                "name": domain,
-                "category": category
-            })
+            all_domains.append({"name": domain, "category": category})
 
     return {
         "status": "ok",
@@ -236,5 +221,5 @@ def list_domains() -> dict:
         "description": data.get("description", ""),
         "total": len(all_domains),
         "domains": data.get("domains", {}),
-        "flat_list": all_domains
+        "flat_list": all_domains,
     }

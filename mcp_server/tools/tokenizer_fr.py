@@ -18,26 +18,155 @@ import unicodedata
 
 # French stopwords (common words to filter out)
 STOPWORDS_FR = {
-    "le", "la", "les", "l", "un", "une", "des", "du", "de", "d",
-    "et", "ou", "mais", "donc", "car", "que", "qui", "quoi",
-    "je", "tu", "il", "elle", "on", "nous", "vous", "ils", "elles",
-    "ce", "cette", "ces", "mon", "ton", "son", "notre", "votre", "leur",
-    "est", "sont", "a", "ont", "fait", "peut", "doit", "etre", "avoir",
-    "ne", "pas", "plus", "tres", "bien", "tout", "tous", "toute", "toutes",
-    "pour", "dans", "sur", "avec", "sans", "par", "entre", "vers", "chez",
-    "au", "aux", "si", "ni", "comme", "meme", "aussi", "encore",
+    "le",
+    "la",
+    "les",
+    "l",
+    "un",
+    "une",
+    "des",
+    "du",
+    "de",
+    "d",
+    "et",
+    "ou",
+    "mais",
+    "donc",
+    "car",
+    "que",
+    "qui",
+    "quoi",
+    "je",
+    "tu",
+    "il",
+    "elle",
+    "on",
+    "nous",
+    "vous",
+    "ils",
+    "elles",
+    "ce",
+    "cette",
+    "ces",
+    "mon",
+    "ton",
+    "son",
+    "notre",
+    "votre",
+    "leur",
+    "est",
+    "sont",
+    "a",
+    "ont",
+    "fait",
+    "peut",
+    "doit",
+    "etre",
+    "avoir",
+    "ne",
+    "pas",
+    "plus",
+    "tres",
+    "bien",
+    "tout",
+    "tous",
+    "toute",
+    "toutes",
+    "pour",
+    "dans",
+    "sur",
+    "avec",
+    "sans",
+    "par",
+    "entre",
+    "vers",
+    "chez",
+    "au",
+    "aux",
+    "si",
+    "ni",
+    "comme",
+    "meme",
+    "aussi",
+    "encore",
 }
 
 # English stopwords (common words to filter out)
 STOPWORDS_EN = {
-    "the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
-    "have", "has", "had", "do", "does", "did", "will", "would", "could",
-    "should", "shall", "may", "might", "must", "can",
-    "i", "you", "he", "she", "it", "we", "they", "this", "that", "these",
-    "of", "in", "to", "for", "with", "on", "at", "by", "from", "up", "out",
-    "and", "or", "but", "if", "not", "no", "yes", "so", "as", "than",
-    "very", "too", "just", "only", "also", "about", "more", "some", "any",
-    "what", "which", "who", "when", "where", "how", "all", "each", "both",
+    "the",
+    "a",
+    "an",
+    "is",
+    "are",
+    "was",
+    "were",
+    "be",
+    "been",
+    "being",
+    "have",
+    "has",
+    "had",
+    "do",
+    "does",
+    "did",
+    "will",
+    "would",
+    "could",
+    "should",
+    "shall",
+    "may",
+    "might",
+    "must",
+    "can",
+    "i",
+    "you",
+    "he",
+    "she",
+    "it",
+    "we",
+    "they",
+    "this",
+    "that",
+    "these",
+    "of",
+    "in",
+    "to",
+    "for",
+    "with",
+    "on",
+    "at",
+    "by",
+    "from",
+    "up",
+    "out",
+    "and",
+    "or",
+    "but",
+    "if",
+    "not",
+    "no",
+    "yes",
+    "so",
+    "as",
+    "than",
+    "very",
+    "too",
+    "just",
+    "only",
+    "also",
+    "about",
+    "more",
+    "some",
+    "any",
+    "what",
+    "which",
+    "who",
+    "when",
+    "where",
+    "how",
+    "all",
+    "each",
+    "both",
 }
 
 # Combined stopwords
@@ -64,9 +193,9 @@ def normalize_accent(text: str) -> str:
         'evenement'
     """
     # NFD decomposition: é -> e + combining acute accent
-    normalized = unicodedata.normalize('NFD', text)
+    normalized = unicodedata.normalize("NFD", text)
     # Remove combining characters (category 'Mn' = Mark, Nonspacing)
-    return ''.join(c for c in normalized if unicodedata.category(c) != 'Mn')
+    return "".join(c for c in normalized if unicodedata.category(c) != "Mn")
 
 
 def tokenize_fr(text: str, remove_stopwords: bool = True) -> list[str]:
@@ -104,14 +233,14 @@ def tokenize_fr(text: str, remove_stopwords: bool = True) -> list[str]:
 
     # Extract tokens: words, numbers, and hyphenated compounds
     # Pattern matches: word characters and internal hyphens
-    raw_tokens = re.findall(r'[a-z0-9]+(?:-[a-z0-9]+)*', text)
+    raw_tokens = re.findall(r"[a-z0-9]+(?:-[a-z0-9]+)*", text)
 
     # Split compound words on hyphens
     tokens = []
     for token in raw_tokens:
-        if '-' in token:
+        if "-" in token:
             # Split and add individual parts
-            parts = token.split('-')
+            parts = token.split("-")
             tokens.extend(parts)
         else:
             tokens.append(token)

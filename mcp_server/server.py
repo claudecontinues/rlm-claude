@@ -15,11 +15,11 @@ Usage:
 """
 
 from mcp.server.fastmcp import FastMCP
-from tools.memory import remember, recall, forget, memory_status
-from tools.navigation import chunk, peek, grep, list_chunks
+from tools.memory import forget, memory_status, recall, remember
+from tools.navigation import chunk, grep, list_chunks, peek
+from tools.retention import restore, retention_preview, retention_run
 from tools.search import search as bm25_search
-from tools.sessions import list_sessions, list_domains
-from tools.retention import retention_preview, retention_run, restore, get_archive_stats
+from tools.sessions import list_domains, list_sessions
 
 # Initialize the MCP server
 mcp = FastMCP("RLM Server")
@@ -29,12 +29,10 @@ mcp = FastMCP("RLM Server")
 # MEMORY TOOLS
 # =============================================================================
 
+
 @mcp.tool()
 def rlm_remember(
-    content: str,
-    category: str = "general",
-    importance: str = "medium",
-    tags: str = ""
+    content: str, category: str = "general", importance: str = "medium", tags: str = ""
 ) -> str:
     """
     Save an important insight to persistent memory.
@@ -57,12 +55,7 @@ def rlm_remember(
 
 
 @mcp.tool()
-def rlm_recall(
-    query: str = "",
-    category: str = "",
-    importance: str = "",
-    limit: int = 10
-) -> str:
+def rlm_recall(query: str = "", category: str = "", importance: str = "", limit: int = 10) -> str:
     """
     Retrieve insights from memory.
 
@@ -82,7 +75,7 @@ def rlm_recall(
         query=query if query else None,
         category=category if category else None,
         importance=importance if importance else None,
-        limit=limit
+        limit=limit,
     )
 
     if result["count"] == 0:
@@ -129,7 +122,9 @@ def rlm_status() -> str:
     # Memory stats (Phase 1)
     mem_result = memory_status()
     categories_str = ", ".join(f"{k}: {v}" for k, v in mem_result["by_category"].items()) or "none"
-    importance_str = ", ".join(f"{k}: {v}" for k, v in mem_result["by_importance"].items()) or "none"
+    importance_str = (
+        ", ".join(f"{k}: {v}" for k, v in mem_result["by_importance"].items()) or "none"
+    )
 
     # Chunks stats (Phase 2)
     chunks_result = list_chunks(limit=1000)  # Get all chunks for accurate count
@@ -154,7 +149,7 @@ def rlm_status() -> str:
         access_stats = "\n  Most accessed:\n"
         for chunk_id, summary, count in top_accessed:
             access_stats += f"    - {chunk_id}: {count}x ({summary}...)\n"
-    elif chunks_result['total_chunks'] > 0:
+    elif chunks_result["total_chunks"] > 0:
         access_stats = "\n  No chunks accessed yet\n"
 
     return (
@@ -175,6 +170,7 @@ def rlm_status() -> str:
 # NAVIGATION TOOLS (Phase 2)
 # =============================================================================
 
+
 @mcp.tool()
 def rlm_chunk(
     content: str,
@@ -182,7 +178,7 @@ def rlm_chunk(
     tags: str = "",
     project: str = "",
     ticket: str = "",
-    domain: str = ""
+    domain: str = "",
 ) -> str:
     """
     Save content to an external chunk file for later retrieval.
@@ -218,7 +214,7 @@ def rlm_chunk(
         tags=tags_list,
         project=project if project else None,
         ticket=ticket if ticket else None,
-        domain=domain if domain else None
+        domain=domain if domain else None,
     )
 
     # Phase 4.2: Handle duplicate detection
@@ -234,11 +230,7 @@ def rlm_chunk(
 
 
 @mcp.tool()
-def rlm_peek(
-    chunk_id: str,
-    start: int = 0,
-    end: int = -1
-) -> str:
+def rlm_peek(chunk_id: str, start: int = 0, end: int = -1) -> str:
     """
     Read content from a previously saved chunk.
 
@@ -273,7 +265,7 @@ def rlm_grep(
     project: str = "",
     domain: str = "",
     fuzzy: bool = False,
-    fuzzy_threshold: int = 80
+    fuzzy_threshold: int = 80,
 ) -> str:
     """
     Search for a pattern across all saved chunks.
@@ -301,7 +293,7 @@ def rlm_grep(
         project=project if project else None,
         domain=domain if domain else None,
         fuzzy=fuzzy,
-        fuzzy_threshold=fuzzy_threshold
+        fuzzy_threshold=fuzzy_threshold,
     )
 
     # Handle error (e.g., thefuzz not installed)
@@ -336,12 +328,7 @@ def rlm_grep(
 
 
 @mcp.tool()
-def rlm_search(
-    query: str,
-    limit: int = 5,
-    project: str = "",
-    domain: str = ""
-) -> str:
+def rlm_search(query: str, limit: int = 5, project: str = "", domain: str = "") -> str:
     """
     Search chunks using BM25 ranking (Phase 5.1).
 
@@ -362,10 +349,7 @@ def rlm_search(
         Ranked list of matching chunks with scores
     """
     result = bm25_search(
-        query,
-        limit,
-        project=project if project else None,
-        domain=domain if domain else None
+        query, limit, project=project if project else None, domain=domain if domain else None
     )
 
     if result["status"] == "error":
@@ -412,9 +396,7 @@ def rlm_list_chunks(limit: int = 20) -> str:
     for c in result["chunks"]:
         tags_str = f" [{', '.join(c['tags'])}]" if c["tags"] else ""
         output.append(
-            f"\n{c['id']}{tags_str}\n"
-            f"  {c['summary']}\n"
-            f"  ~{c['tokens']} tokens | {c['created']}"
+            f"\n{c['id']}{tags_str}\n  {c['summary']}\n  ~{c['tokens']} tokens | {c['created']}"
         )
 
     return "".join(output)
@@ -424,12 +406,9 @@ def rlm_list_chunks(limit: int = 20) -> str:
 # SESSION TOOLS (Phase 5.5b)
 # =============================================================================
 
+
 @mcp.tool()
-def rlm_sessions(
-    project: str = "",
-    domain: str = "",
-    limit: int = 10
-) -> str:
+def rlm_sessions(project: str = "", domain: str = "", limit: int = 10) -> str:
     """
     List available sessions, optionally filtered by project or domain.
 
@@ -445,9 +424,7 @@ def rlm_sessions(
         List of sessions with their metadata
     """
     result = list_sessions(
-        project=project if project else None,
-        domain=domain if domain else None,
-        limit=limit
+        project=project if project else None, domain=domain if domain else None, limit=limit
     )
 
     if result["total"] == 0:
@@ -500,12 +477,9 @@ def rlm_domains() -> str:
 
     for category, info in result["domains"].items():
         domains_list = ", ".join(info.get("list", []))
-        output.append(
-            f"\n[{category}] {info.get('description', '')}\n"
-            f"  {domains_list}"
-        )
+        output.append(f"\n[{category}] {info.get('description', '')}\n  {domains_list}")
 
-    output.append(f"\n\nNote: You can use any domain, these are just suggestions.")
+    output.append("\n\nNote: You can use any domain, these are just suggestions.")
 
     return "".join(output)
 
@@ -513,6 +487,7 @@ def rlm_domains() -> str:
 # =============================================================================
 # RETENTION TOOLS (Phase 5.6)
 # =============================================================================
+
 
 @mcp.tool()
 def rlm_retention_preview() -> str:
@@ -524,10 +499,7 @@ def rlm_retention_preview() -> str:
     """
     result = retention_preview()
 
-    output = [
-        "Retention Preview (dry-run)\n"
-        "=" * 40
-    ]
+    output = ["Retention Preview (dry-run)\n=" * 40]
 
     # Archive candidates
     archive_count = result["archive_count"]
@@ -539,8 +511,7 @@ def rlm_retention_preview() -> str:
         for c in result["archive_candidates"][:10]:
             tags_str = f" [{', '.join(c['tags'][:3])}]" if c.get("tags") else ""
             output.append(
-                f"  - {c['id']}{tags_str}\n"
-                f"    {c['summary']}... (access: {c['access_count']})"
+                f"  - {c['id']}{tags_str}\n    {c['summary']}... (access: {c['access_count']})"
             )
         if archive_count > 10:
             output.append(f"  ... and {archive_count - 10} more")
@@ -553,10 +524,7 @@ def rlm_retention_preview() -> str:
         output.append("  None - no archives old enough for purging")
     else:
         for c in result["purge_candidates"][:10]:
-            output.append(
-                f"  - {c['id']} (archived: {c['archived_at']})\n"
-                f"    {c['summary']}..."
-            )
+            output.append(f"  - {c['id']} (archived: {c['archived_at']})\n    {c['summary']}...")
         if purge_count > 10:
             output.append(f"  ... and {purge_count - 10} more")
 
@@ -577,10 +545,7 @@ def rlm_retention_run(archive: bool = True, purge: bool = False) -> str:
     """
     result = retention_run(archive=archive, purge=purge)
 
-    output = [
-        "Retention Execution\n"
-        "=" * 40
-    ]
+    output = ["Retention Execution\n=" * 40]
 
     # Archived
     if result["archived_count"] > 0:
