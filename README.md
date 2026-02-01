@@ -1,399 +1,229 @@
-# RLM - Recursive Language Models for Claude Code
+# RLM - Infinite Memory for Claude Code
 
-> **Memoire infinie pour Claude** - Solution MCP avec auto-chunking 100% automatique
+> Your Claude Code sessions forget everything after `/compact`. RLM fixes that.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.10+](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![MCP Server](https://img.shields.io/badge/MCP-Server-green.svg)](https://modelcontextprotocol.io)
+
+[Fran&ccedil;ais](README.fr.md) | English
 
 ---
 
-## Le Probleme
+## The Problem
 
-Les LLMs souffrent de **degradation avec les contextes longs** :
-- **Lost in the Middle** : Performance degradee sur les informations au milieu du contexte
-- **Context Rot** : Degradation progressive (~60% = debut des problemes)
-- Claude devient "lazy et dumb" au-dela de 60-65% de contexte
+Claude Code has a **context window limit**. When it fills up:
+- `/compact` wipes your conversation history
+- Previous decisions, insights, and context are **lost**
+- You repeat yourself. Claude makes the same mistakes. Productivity drops.
 
-## La Solution : RLM
+## The Solution
 
-Inspire du paper **"Recursive Language Models"** (MIT CSAIL, arXiv:2512.24601, Dec 2025) :
+**RLM** is an MCP server that gives Claude Code **persistent memory across sessions**:
 
-1. **Contexte comme objet externe** - L'historique est stocke en fichiers, pas charge en memoire
-2. **Tools de navigation** - Peek, grep, search au lieu de tout lire
-3. **Memoire d'insights** - Decisions et faits cles sauvegardes separement
-4. **Auto-chunking** - Sauvegarde automatique via hooks Claude Code
-5. **Sub-agents** - Deleguer des analyses a des workers isoles
+```
+You: "Remember that the client prefers 500ml bottles"
+     → Saved. Forever. Across all sessions.
+
+You: "What did we decide about the API architecture?"
+     → Claude searches its memory and finds the answer.
+```
+
+**3 lines to install. 14 tools. Zero configuration.**
 
 ---
 
-## Installation Rapide
+## Quick Install
 
 ```bash
-# 1. Cloner le repo
 git clone https://github.com/EncrEor/rlm-claude.git
 cd rlm-claude
-
-# 2. Installer (100% automatique)
 ./install.sh
-
-# 3. Relancer Claude Code
-# RLM est pret !
 ```
 
-**Prerequis** : Python 3.10+, Claude Code CLI
+Restart Claude Code. Done.
 
-### Installation Manuelle
-
-Si vous preferez installer manuellement :
-
-```bash
-# Installer les dependances
-pip install -r mcp_server/requirements.txt
-
-# Ajouter le serveur MCP
-claude mcp add rlm-server -- python3 $(pwd)/mcp_server/server.py
-
-# Copier les hooks
-mkdir -p ~/.claude/rlm/hooks
-cp hooks/*.py ~/.claude/rlm/hooks/
-chmod +x ~/.claude/rlm/hooks/*.py
-
-# Copier le skill
-mkdir -p ~/.claude/skills/rlm-analyze
-cp templates/skills/rlm-analyze/skill.md ~/.claude/skills/rlm-analyze/
-
-# Configurer les hooks dans ~/.claude/settings.json
-# (voir templates/hooks_settings.json)
-```
+**Requirements**: Python 3.10+, Claude Code CLI
 
 ---
 
-## Comment Ca Marche
-
-### Architecture
+## How It Works
 
 ```
-+-------------------------------------------------------------------+
-|                  RLM - Architecture v0.9.0                         |
-+-------------------------------------------------------------------+
-|                                                                    |
-|  HOOKS CLAUDE CODE (2 hooks)                                      |
-|  +--------------------------------------------------------------+ |
-|  | Hook "PreCompact" (AVANT /compact ou auto-compact)           | |
-|  |   -> pre_compact_chunk.py                                    | |
-|  |   -> Cree un chunk automatique minimal                       | |
-|  |   -> Sauvegarde garantie avant perte de contexte             | |
-|  +--------------------------------------------------------------+ |
-|  | Hook "PostToolUse" (apres rlm_chunk)                         | |
-|  |   -> reset_chunk_counter.py (pour stats)                     | |
-|  +--------------------------------------------------------------+ |
-|                              |                                     |
-|                              v                                     |
-|  UTILISATEUR + CLAUDE                                             |
-|    - User: "chunk ca", "garde en memoire", "rlm_remember"        |
-|    - Claude: Propose chunk aux moments cles                       |
-|    - Post-compact: Claude lit le chunk auto et enrichit          |
-|                              |                                     |
-|                              v                                     |
-|  MCP SERVER RLM (14 tools)                                        |
-|    - rlm_remember/recall/forget/status (insights)                |
-|    - rlm_chunk/peek/grep/list_chunks + search/sessions (nav)     |
-|    - rlm_retention_preview/run/restore (retention)               |
-|    - Stockage persistant dans context/                           |
-|                                                                    |
-+-------------------------------------------------------------------+
+                    ┌─────────────────────────┐
+                    │     Claude Code CLI      │
+                    └────────────┬────────────┘
+                                 │
+                    ┌────────────▼────────────┐
+                    │    RLM MCP Server        │
+                    │    (14 tools)            │
+                    └────────────┬────────────┘
+                                 │
+              ┌──────────────────┼──────────────────┐
+              │                  │                   │
+    ┌─────────▼────────┐ ┌──────▼──────┐ ┌──────────▼─────────┐
+    │    Insights       │ │   Chunks    │ │    Retention        │
+    │ (key decisions,   │ │ (full conv  │ │ (auto-archive,      │
+    │  facts, prefs)    │ │  history)   │ │  restore, purge)    │
+    └──────────────────┘ └─────────────┘ └────────────────────┘
 ```
 
-### Strategie de Chunking (v0.9.0)
+### Auto-Save Before Context Loss
 
-**Principe** : L'utilisateur decide, le systeme sauvegarde automatiquement avant /compact.
+RLM hooks into Claude Code's `/compact` event. Before your context is wiped, RLM **automatically saves a snapshot**. No action needed.
 
-| Moment | Action | Declencheur |
-|--------|--------|-------------|
-| Instruction explicite | `rlm_chunk()` / `rlm_remember()` | Utilisateur |
-| Moment cle | Claude propose de chunker | Reflexe Claude |
-| `/compact` | Chunk automatique minimal | Hook PreCompact |
-| Post-compact | Claude lit et enrichit | Reflexe Claude |
+### Two Memory Systems
 
-#### Hook PreCompact (SAUVEGARDE AUTO)
-
-Avant `/compact` ou auto-compact → chunk automatique cree :
-- Resume basique de la session
-- Tags: `auto,precompact`
-- Claude peut enrichir apres le compact
-
-#### Triggers Manuels (reflexe Claude)
-
-- 🎯 Décision prise
-- ✅ Tâche terminée
-- 💡 Insight découvert
-- 🔄 Changement de sujet
-- ⚠️ Erreur corrigée
+| System | What it stores | How to use |
+|--------|---------------|------------|
+| **Insights** | Key decisions, facts, preferences | `rlm_remember()` / `rlm_recall()` |
+| **Chunks** | Full conversation segments | `rlm_chunk()` / `rlm_peek()` / `rlm_grep()` |
 
 ---
 
-## Tools MCP Disponibles
+## Features
 
-### Phase 1 - Memory (Insights)
+### Memory & Insights
+- **`rlm_remember`** - Save decisions, facts, preferences with categories and importance levels
+- **`rlm_recall`** - Search insights by keyword, category, or importance
+- **`rlm_forget`** - Remove an insight
+- **`rlm_status`** - System overview (insight count, chunk stats, access metrics)
 
-| Tool | Description |
-|------|-------------|
-| `rlm_remember` | Sauvegarder un insight (decision, fait, preference) |
-| `rlm_recall` | Recuperer des insights par recherche ou categorie |
-| `rlm_forget` | Supprimer un insight par ID |
-| `rlm_status` | Stats du systeme (insights + chunks) |
+### Conversation History
+- **`rlm_chunk`** - Save conversation segments to persistent storage
+- **`rlm_peek`** - Read a chunk (full or partial by line range)
+- **`rlm_grep`** - Regex search across all chunks (+ fuzzy matching for typo tolerance)
+- **`rlm_search`** - BM25 ranked search (FR/EN, accent-normalized)
+- **`rlm_list_chunks`** - List all chunks with metadata
 
-### Phase 2 - Navigation (Chunks)
+### Multi-Project Organization
+- **`rlm_sessions`** - Browse sessions by project or domain
+- **`rlm_domains`** - List available domains for categorization
+- Auto-detection of project from git or working directory
+- Cross-project filtering on all search tools
 
-| Tool | Description |
-|------|-------------|
-| `rlm_chunk` | Sauvegarder du contenu en chunk externe |
-| `rlm_peek` | Lire un chunk (ou portion par lignes) |
-| `rlm_grep` | Chercher un pattern regex dans tous les chunks |
-| `rlm_grep(..., fuzzy=True)` | **NEW v0.6.1** Recherche fuzzy tolerant les typos |
-| `rlm_list_chunks` | Lister les chunks disponibles avec metadonnees |
+### Smart Retention
+- **`rlm_retention_preview`** - Preview what would be archived (dry-run)
+- **`rlm_retention_run`** - Archive old unused chunks, purge ancient ones
+- **`rlm_restore`** - Bring back archived chunks
+- 3-zone lifecycle: **Active** &rarr; **Archive** (.gz) &rarr; **Purge**
+- Immunity system: critical tags, frequent access, and keywords protect chunks
 
-### Phase 5.1 - Search (BM25)
+### Auto-Chunking (Hooks)
+- **PreCompact hook**: Automatic snapshot before `/compact` or auto-compact
+- **PostToolUse hook**: Stats tracking after chunk operations
+- User-driven philosophy: you decide when to chunk, the system saves before loss
 
-| Tool | Description |
-|------|-------------|
-| `rlm_search` | Recherche BM25 par pertinence (FR/EN, accents normalises) |
-
-### Phase 5.5 - Multi-sessions
-
-| Tool | Description |
-|------|-------------|
-| `rlm_sessions` | Lister sessions par projet/domaine |
-| `rlm_domains` | Lister domaines suggeres (31 domaines) |
-| `rlm_grep` | + params `project=`, `domain=` pour filtrer |
-| `rlm_search` | + params `project=`, `domain=` pour filtrer |
-
-**Nouveau format chunk ID** : `{date}_{project}_{seq}[_{ticket}][_{domain}]`
-- Exemple : `2026-01-18_RLM_001_r&d`
-- Auto-detection du projet via git ou cwd
-- Backward compat : chunks existants (format 1.0) restent accessibles
-
-### Phase 5.6 - Retention (v0.7.0)
-
-| Tool | Description |
-|------|-------------|
-| `rlm_retention_preview` | **NEW** Preview des actions archive/purge (dry-run) |
-| `rlm_retention_run` | **NEW** Executer archivage et/ou purge |
-| `rlm_restore` | **NEW** Restaurer un chunk archive |
-
-**Architecture 3 zones** : ACTIF → ARCHIVE (.gz) → PURGE
-- Archive apres 30 jours si `access_count == 0` et non-immune
-- Purge apres 180 jours en archive
-- Immunite : tags `critical`/`decision`, `access_count >= 3`, keywords `DECISION:`/`IMPORTANT:`
-- Auto-restore : `peek()` restaure automatiquement les chunks archives
+### Sub-Agent Skills
+- **`/rlm-analyze`** - Analyze a single chunk with an isolated sub-agent
+- **`/rlm-parallel`** - Analyze multiple chunks in parallel (Map-Reduce pattern from MIT RLM paper)
 
 ---
 
-## Skills RLM
+## Comparison
 
-Claude utilise ces patterns automatiquement quand pertinent (aucune action humaine requise).
-
-### /rlm-analyze
-
-Analyser un chunk avec un sub-agent dedie (contexte isole).
-
-### /rlm-parallel
-
-Analyser plusieurs chunks en parallele et fusionner les resultats.
-Pattern "Partition + Map" du paper MIT RLM.
-
-- 3 analyses paralleles (Task tools Sonnet)
-- 1 merger qui synthetise avec citations [chunk_id]
-- Detection automatique des contradictions
+| Feature | Raw Context | Letta/MemGPT | **RLM** |
+|---------|-------------|--------------|---------|
+| Persistent memory | No | Yes | **Yes** |
+| Works with Claude Code | N/A | No (own runtime) | **Native MCP** |
+| Auto-save before compact | No | N/A | **Yes (hooks)** |
+| Search (regex + BM25) | No | Basic | **Yes** |
+| Fuzzy search (typo-tolerant) | No | No | **Yes** |
+| Multi-project support | No | No | **Yes** |
+| Smart retention (archive/purge) | No | Basic | **Yes** |
+| Sub-agent analysis | No | No | **Yes** |
+| Zero config install | N/A | Complex | **3 lines** |
+| FR/EN support | N/A | EN only | **Both** |
+| Cost | Free | Self-hosted | **Free** |
 
 ---
 
-## Usage
+## Usage Examples
 
-### Sauvegarder des insights
+### Save and recall insights
 
 ```python
-# Sauvegarder une decision importante
-rlm_remember("Le client prefere les formats 500ml",
-             category="preference",
-             importance="high",
-             tags="client,format")
+# Save a key decision
+rlm_remember("Backend is the source of truth for all data",
+             category="decision", importance="high",
+             tags="architecture,backend")
 
-# Retrouver des insights
-rlm_recall(query="client")           # Recherche par mot-cle
-rlm_recall(category="decision")      # Filtrer par categorie
-rlm_recall(importance="critical")    # Filtrer par importance
+# Find it later
+rlm_recall(query="source of truth")
+rlm_recall(category="decision")
 ```
 
-### Gerer l'historique de conversation
+### Manage conversation history
 
 ```python
-# Sauvegarder une partie de conversation importante
-rlm_chunk("Discussion sur le business plan... [contenu long]",
-          summary="BP Joy Juice - Scenarios REA",
-          tags="bp,scenario,2026")
+# Save important discussion
+rlm_chunk("Discussion about API redesign... [long content]",
+          summary="API v2 architecture decisions",
+          tags="api,architecture")
 
-# Phase 4: Auto-summary si pas de summary fourni
-rlm_chunk("Mon contenu ici...", tags="auto")
-# → Summary auto-genere depuis la premiere ligne
+# Search across all history
+rlm_search("API architecture decisions")      # BM25 ranked
+rlm_grep("authentication", fuzzy=True)         # Typo-tolerant
 
-# Phase 4: Detection des doublons
-rlm_chunk("Meme contenu...")  # → "Duplicate detected"
-
-# Voir ce qui est stocke (avec access_count Phase 4)
-rlm_list_chunks()
-
-# Lire un chunk specifique (incremente access_count)
-rlm_peek("2026-01-18_001")
-
-# Chercher dans l'historique (regex)
-rlm_grep("business plan")
-
-# Phase 5.2: Recherche fuzzy (tolere les typos)
-rlm_grep("buisness", fuzzy=True)           # → trouve "business"
-rlm_grep("validaton", fuzzy=True)          # → trouve "validation"
-rlm_grep("senario", fuzzy=True, fuzzy_threshold=70)  # Plus tolerant
-
-# Phase 5.5c: Filtrer par projet/domaine
-rlm_grep("equipment", project="JoyJuice", domain="bp")
-
-# Recherche BM25 par pertinence (Phase 5)
-rlm_search("discussion sur le business plan")
-# → Retourne les chunks tries par score de pertinence
-# → Supporte FR/EN, normalise les accents (realiste = réaliste)
-
-# Phase 5.5c: Filtrer les recherches
-rlm_search("scenarios", project="JoyJuice")
-
-# Lister les sessions disponibles
-rlm_sessions()                          # Toutes
-rlm_sessions(project="RLM")             # Par projet
-rlm_sessions(domain="bp")               # Par domaine
-
-# Voir les domaines disponibles
-rlm_domains()  # → 31 domaines (23 Joy Juice + 8 default)
+# Read a specific chunk
+rlm_peek("2026-01-18_MyProject_001")
 ```
 
-### Voir l'etat du systeme
+### Multi-project organization
 
 ```python
-rlm_status()
-# Output:
-# RLM Memory Status (v1.0.0)
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# Insights: 5
-#   By category: decision: 2, finding: 3
-#   By importance: high: 3, medium: 2
-# Chunks: 3 (~4500 tokens)
+# Filter by project
+rlm_search("deployment issues", project="MyApp")
+rlm_grep("database", project="MyApp", domain="infra")
+
+# Browse sessions
+rlm_sessions(project="MyApp")
 ```
 
 ---
 
-## Categories d'Insights
-
-| Categorie | Usage |
-|-----------|-------|
-| `decision` | Decisions prises pendant la session |
-| `fact` | Faits decouverts ou confirmes |
-| `preference` | Preferences de l'utilisateur |
-| `finding` | Decouvertes techniques |
-| `todo` | Actions a faire |
-| `general` | Autre |
-
-## Niveaux d'Importance
-
-- `low` : Info de contexte
-- `medium` : Standard (defaut)
-- `high` : Important a retenir
-- `critical` : Ne jamais oublier
-
----
-
-## Structure du Projet
+## Project Structure
 
 ```
-RLM/
+rlm-claude/
 ├── mcp_server/
-│   ├── server.py              # Serveur MCP (14 tools)
+│   ├── server.py              # MCP server (14 tools)
 │   └── tools/
-│       ├── memory.py          # Phase 1 (insights)
-│       ├── navigation.py      # Phase 2 + 5.5 (chunks + auto-restore)
-│       ├── tokenizer_fr.py    # Phase 5.1 (tokenization FR/EN)
-│       ├── search.py          # Phase 5.1 (BM25 search)
-│       ├── sessions.py        # Phase 5.5 (sessions, domains)
-│       └── retention.py       # Phase 5.6 (archive/restore/purge)
+│       ├── memory.py          # Insights (remember/recall/forget)
+│       ├── navigation.py      # Chunks (chunk/peek/grep/list)
+│       ├── search.py          # BM25 search engine
+│       ├── tokenizer_fr.py    # FR/EN tokenization
+│       ├── sessions.py        # Multi-session management
+│       └── retention.py       # Archive/restore/purge lifecycle
 │
-├── hooks/                     # Phase 3+ (auto-chunking)
-│   ├── pre_compact_chunk.py   # Hook PreCompact - force chunk avant compact
-│   ├── auto_chunk_check.py    # Hook Stop - progressif + context-aware
-│   └── reset_chunk_counter.py # Hook PostToolUse - reset compteur
+├── hooks/                     # Claude Code hooks
+│   ├── pre_compact_chunk.py   # Auto-save before /compact
+│   ├── auto_chunk_check.py    # Turn tracking
+│   └── reset_chunk_counter.py # Stats reset after chunk
 │
 ├── templates/
-│   ├── hooks_settings.json    # Config hooks a copier
-│   ├── CLAUDE_RLM_SNIPPET.md  # Instructions CLAUDE.md
-│   └── skills/
-│       ├── rlm-analyze/
-│       │   └── skill.md       # Skill analyse 1 chunk
-│       └── rlm-parallel/
-│           └── skill.md       # Skill analyse parallele
+│   ├── hooks_settings.json    # Hook config template
+│   ├── CLAUDE_RLM_SNIPPET.md  # CLAUDE.md instructions
+│   └── skills/                # Sub-agent skills
 │
-├── context/                   # Stockage (cree a l'install)
-│   ├── session_memory.json    # Insights stockes (local, git-ignored)
-│   ├── index.json             # Index des chunks (local, git-ignored)
-│   ├── sessions.json          # Index des sessions (local, git-ignored)
-│   ├── domains.json           # Domaines suggeres (local, auto-genere)
-│   ├── domains.json.example   # Exemple avec domaines Joy Juice
-│   ├── chunks/                # Historique decoupe
-│   ├── archive/               # Chunks archives .gz (Phase 5.6)
-│   ├── archive_index.json     # Index des archives (Phase 5.6)
-│   └── purge_log.json         # Log des purges (Phase 5.6)
+├── context/                   # Storage (created at install, git-ignored)
+│   ├── session_memory.json    # Insights
+│   ├── index.json             # Chunk index
+│   ├── chunks/                # Conversation history
+│   ├── archive/               # Compressed archives (.gz)
+│   └── sessions.json          # Session index
 │
-├── install.sh                 # Script installation
-├── README.md                  # Cette documentation
-├── SESSION_CONTEXT.md         # Contexte de reprise
-├── ROADMAP.md                 # Pistes futures
-└── docs/
-    ├── STATE_OF_ART.md        # Recherche (RLM, Letta, TTT)
-    ├── IMPLEMENTATION_PROPOSAL.md
-    └── CHECKLIST_PAPER_VS_SOLUTION.md
+├── install.sh                 # One-command installer
+└── README.md
 ```
 
 ---
 
 ## Configuration
 
-### Personnalisation des Domaines
+### Hook Configuration
 
-Les domaines sont des suggestions pour organiser vos chunks par theme.
-Un fichier `domains.json` generique est cree automatiquement au premier lancement.
-
-Pour personnaliser :
-
-```bash
-# Voir l'exemple complet (Joy Juice)
-cat context/domains.json.example
-
-# Editer votre fichier local
-nano context/domains.json
-```
-
-Structure du fichier :
-
-```json
-{
-  "domains": {
-    "mon_projet": {
-      "description": "Domaines pour mon projet",
-      "list": ["feature", "bugfix", "infra", "docs"]
-    }
-  }
-}
-```
-
-Note : Vous pouvez utiliser n'importe quel domaine, meme s'il n'est pas dans la liste.
-
-### Hooks Claude Code (v0.9.0)
-
-Dans `~/.claude/settings.json` :
+The installer automatically configures hooks in `~/.claude/settings.json`:
 
 ```json
 {
@@ -401,34 +231,56 @@ Dans `~/.claude/settings.json` :
     "PreCompact": [
       {
         "matcher": "manual",
-        "hooks": [{
-          "type": "command",
-          "command": "python3 ~/.claude/rlm/hooks/pre_compact_chunk.py"
-        }]
+        "hooks": [{ "type": "command", "command": "python3 ~/.claude/rlm/hooks/pre_compact_chunk.py" }]
       },
       {
         "matcher": "auto",
-        "hooks": [{
-          "type": "command",
-          "command": "python3 ~/.claude/rlm/hooks/pre_compact_chunk.py"
-        }]
+        "hooks": [{ "type": "command", "command": "python3 ~/.claude/rlm/hooks/pre_compact_chunk.py" }]
       }
     ],
     "PostToolUse": [{
       "matcher": "mcp__rlm-server__rlm_chunk",
-      "hooks": [{
-        "type": "command",
-        "command": "python3 ~/.claude/rlm/hooks/reset_chunk_counter.py"
-      }]
+      "hooks": [{ "type": "command", "command": "python3 ~/.claude/rlm/hooks/reset_chunk_counter.py" }]
     }]
   }
 }
 ```
 
-**Notes** :
-- `PreCompact` cree un chunk automatique avant /compact (manual ou auto)
-- Hook `Stop` supprime en v0.9.0 (pas de reminders automatiques)
-- L'utilisateur decide quand chunker, le systeme sauvegarde avant perte
+### Custom Domains
+
+Organize chunks by topic with custom domains:
+
+```json
+{
+  "domains": {
+    "my_project": {
+      "description": "Domains for my project",
+      "list": ["feature", "bugfix", "infra", "docs"]
+    }
+  }
+}
+```
+
+Edit `context/domains.json` after installation.
+
+---
+
+## Manual Installation
+
+If you prefer to install manually:
+
+```bash
+pip install -r mcp_server/requirements.txt
+claude mcp add rlm-server -- python3 $(pwd)/mcp_server/server.py
+mkdir -p ~/.claude/rlm/hooks
+cp hooks/*.py ~/.claude/rlm/hooks/
+chmod +x ~/.claude/rlm/hooks/*.py
+mkdir -p ~/.claude/skills/rlm-analyze ~/.claude/skills/rlm-parallel
+cp templates/skills/rlm-analyze/skill.md ~/.claude/skills/rlm-analyze/
+cp templates/skills/rlm-parallel/skill.md ~/.claude/skills/rlm-parallel/
+```
+
+Then configure hooks in `~/.claude/settings.json` (see above).
 
 ---
 
@@ -437,80 +289,46 @@ Dans `~/.claude/settings.json` :
 ### "MCP server not found"
 
 ```bash
-claude mcp list                    # Verifier les serveurs
-claude mcp remove rlm-server       # Supprimer si existe
+claude mcp list                    # Check servers
+claude mcp remove rlm-server       # Remove if exists
 claude mcp add rlm-server -- python3 /path/to/mcp_server/server.py
 ```
 
-### "Hooks ne fonctionnent pas"
+### "Hooks not working"
 
 ```bash
-# Tester manuellement
-python3 ~/.claude/rlm/hooks/auto_chunk_check.py
-cat ~/.claude/rlm/chunk_state.json
-
-# Verifier settings.json
-cat ~/.claude/settings.json | grep -A 10 "hooks"
-```
-
-### "Skill /rlm-analyze non trouve"
-
-```bash
-ls ~/.claude/skills/rlm-analyze/
-# Doit contenir skill.md
+python3 ~/.claude/rlm/hooks/auto_chunk_check.py   # Test manually
+cat ~/.claude/rlm/chunk_state.json                  # Check state
+cat ~/.claude/settings.json | grep -A 10 "hooks"    # Verify config
 ```
 
 ---
 
 ## Roadmap
 
-- [x] **Phase 1** : Memory tools (remember/recall/forget/status)
-- [x] **Phase 2** : Navigation tools (chunk/peek/grep/list)
-- [x] **Phase 3** : Auto-chunking + Skill /rlm-analyze
-- [x] **Phase 4** : Production (auto-summary, dedup, access tracking)
-- [x] **Phase 5** : Avance
-  - [x] 5.1 : BM25 search (rlm_search)
-  - [x] 5.2 : Fuzzy grep (v0.6.1 - tolere typos)
-  - [x] 5.3 : Sub-agents paralleles (/rlm-parallel)
-  - [x] 5.5 : Multi-sessions (sessions, domains, filtres project/domain)
-  - [x] **5.6 : Retention** (v0.7.0 - archive/purge)
-- [ ] **Phase 6** : Production-Ready (tests, CI/CD, PyPI)
-
-Voir [ROADMAP.md](ROADMAP.md) pour les details.
+- [x] **Phase 1**: Memory tools (remember/recall/forget/status)
+- [x] **Phase 2**: Navigation tools (chunk/peek/grep/list)
+- [x] **Phase 3**: Auto-chunking + sub-agent skills
+- [x] **Phase 4**: Production (auto-summary, dedup, access tracking)
+- [x] **Phase 5**: Advanced (BM25 search, fuzzy grep, multi-sessions, retention)
+- [ ] **Phase 6**: Production-ready (tests, CI/CD, PyPI)
 
 ---
 
-## Documentation
+## Inspired By
 
-| Fichier | Contenu |
-|---------|---------|
-| [STATE_OF_ART.md](STATE_OF_ART.md) | Etat de l'art (RLM, Letta, TTT-E2E) |
-| [IMPLEMENTATION_PROPOSAL.md](IMPLEMENTATION_PROPOSAL.md) | Architecture detaillee |
-| [CHECKLIST_PAPER_VS_SOLUTION.md](CHECKLIST_PAPER_VS_SOLUTION.md) | Couverture paper MIT (85%) |
-| [SESSION_CONTEXT.md](SESSION_CONTEXT.md) | Contexte pour reprendre une session |
-| [ROADMAP.md](ROADMAP.md) | Pistes futures |
-
----
-
-## References
-
-- [Paper RLM (MIT CSAIL)](https://arxiv.org/abs/2512.24601) - Zhang et al., Dec 2025
-- [Prime Intellect Blog](https://www.primeintellect.ai/blog/rlm)
-- [Letta/MemGPT](https://github.com/letta-ai/letta)
+- [RLM Paper (MIT CSAIL)](https://arxiv.org/abs/2512.24601) - Zhang et al., Dec 2025 - "Recursive Language Models"
+- [Letta/MemGPT](https://github.com/letta-ai/letta) - AI agent memory framework
 - [MCP Specification](https://modelcontextprotocol.io/specification)
 - [Claude Code Hooks](https://docs.anthropic.com/claude-code/hooks)
 
 ---
 
-## Auteurs
+## Authors
 
 - Ahmed MAKNI ([@EncrEor](https://github.com/EncrEor))
-- Claude Opus 4.5 (R&D conjointe)
+- Claude Opus 4.5 (joint R&D)
 
 ## License
 
-MIT License - voir [LICENSE](LICENSE)
-
----
-
-**Derniere mise a jour** : 2026-01-24 (v0.9.0 - Systeme Simplifie User-Driven + Auto-Compact)
+MIT License - see [LICENSE](LICENSE)
