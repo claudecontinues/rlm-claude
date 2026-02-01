@@ -109,7 +109,7 @@ echo "  OK - Repertoires crees"
 # 2. Copy hook scripts
 # =============================================================================
 echo "[2/7] Installation des hooks..."
-cp "$SCRIPT_DIR/hooks/auto_chunk_check.py" "$RLM_DIR/hooks/"
+cp "$SCRIPT_DIR/hooks/pre_compact_chunk.py" "$RLM_DIR/hooks/"
 cp "$SCRIPT_DIR/hooks/reset_chunk_counter.py" "$RLM_DIR/hooks/"
 chmod +x "$RLM_DIR/hooks/"*.py
 echo "  OK - Hooks installes"
@@ -180,15 +180,24 @@ from pathlib import Path
 
 settings_file = Path.home() / ".claude" / "settings.json"
 
-# RLM hooks to add
+# RLM hooks to add (matches templates/hooks_settings.json)
 rlm_hooks = {
-    "Stop": [{
-        "matcher": "*",
-        "hooks": [{
-            "type": "command",
-            "command": "python3 ~/.claude/rlm/hooks/auto_chunk_check.py"
-        }]
-    }],
+    "PreCompact": [
+        {
+            "matcher": "manual",
+            "hooks": [{
+                "type": "command",
+                "command": "python3 ~/.claude/rlm/hooks/pre_compact_chunk.py"
+            }]
+        },
+        {
+            "matcher": "auto",
+            "hooks": [{
+                "type": "command",
+                "command": "python3 ~/.claude/rlm/hooks/pre_compact_chunk.py"
+            }]
+        }
+    ],
     "PostToolUse": [{
         "matcher": "mcp__rlm-server__rlm_chunk",
         "hooks": [{
@@ -212,22 +221,38 @@ else:
 if "hooks" not in settings:
     settings["hooks"] = {}
 
-# Merge RLM hooks (avoid duplicates)
+# Clean up legacy Stop hook from older installs (replaced by PreCompact)
+if "Stop" in settings["hooks"]:
+    settings["hooks"]["Stop"] = [
+        entry for entry in settings["hooks"]["Stop"]
+        if not any(
+            "auto_chunk_check.py" in h.get("command", "")
+            for h in entry.get("hooks", [])
+        )
+    ]
+    if not settings["hooks"]["Stop"]:
+        del settings["hooks"]["Stop"]
+
+# Merge RLM hooks (avoid duplicates by matcher+command pair)
 for hook_type, hook_configs in rlm_hooks.items():
     if hook_type not in settings["hooks"]:
         settings["hooks"][hook_type] = []
 
-    existing_cmds = []
+    # Build set of existing (matcher, command) pairs
+    existing_pairs = set()
     for existing in settings["hooks"][hook_type]:
+        matcher = existing.get("matcher", "")
         for h in existing.get("hooks", []):
             if h.get("command"):
-                existing_cmds.append(h["command"])
+                existing_pairs.add((matcher, h["command"]))
 
     for config in hook_configs:
+        matcher = config.get("matcher", "")
         for h in config.get("hooks", []):
             cmd = h.get("command", "")
-            if cmd and cmd not in existing_cmds:
+            if cmd and (matcher, cmd) not in existing_pairs:
                 settings["hooks"][hook_type].append(config)
+                existing_pairs.add((matcher, cmd))
                 break
 
 # Save
@@ -319,8 +344,8 @@ echo "  Installation terminee avec succes!"
 echo "=============================================="
 echo ""
 echo "RLM est maintenant installe avec :"
-echo "  - 11 tools MCP disponibles"
-echo "  - Auto-chunking active (hook Stop)"
+echo "  - 14 tools MCP disponibles"
+echo "  - Auto-save avant /compact (hook PreCompact)"
 echo "  - Skills /rlm-analyze et /rlm-parallel installes"
 echo ""
 echo "PROCHAINE ETAPE:"
