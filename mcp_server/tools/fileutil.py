@@ -83,9 +83,7 @@ def atomic_write_json(filepath: Path, data: dict, ensure_ascii: bool = False) ->
     filepath.parent.mkdir(parents=True, exist_ok=True)
 
     # Write to temp file in same directory (same filesystem = atomic rename)
-    fd, tmp_path = tempfile.mkstemp(
-        dir=filepath.parent, prefix=f".{filepath.name}.", suffix=".tmp"
-    )
+    fd, tmp_path = tempfile.mkstemp(dir=filepath.parent, prefix=f".{filepath.name}.", suffix=".tmp")
     try:
         with open(fd, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=ensure_ascii)
@@ -109,9 +107,7 @@ def atomic_write_text(filepath: Path, content: str) -> None:
     """
     filepath.parent.mkdir(parents=True, exist_ok=True)
 
-    fd, tmp_path = tempfile.mkstemp(
-        dir=filepath.parent, prefix=f".{filepath.name}.", suffix=".tmp"
-    )
+    fd, tmp_path = tempfile.mkstemp(dir=filepath.parent, prefix=f".{filepath.name}.", suffix=".tmp")
     try:
         with open(fd, "w", encoding="utf-8") as f:
             f.write(content)
@@ -173,7 +169,9 @@ def locked_json_update(filepath: Path, default: dict | None = None):
             pass
 
 
-def load_json_safe(filepath: Path, default: dict | None = None, required_keys: list | None = None) -> dict:
+def load_json_safe(
+    filepath: Path, default: dict | None = None, required_keys: list | None = None
+) -> dict:
     """
     Load JSON with basic structure validation.
 
