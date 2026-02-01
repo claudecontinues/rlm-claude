@@ -24,8 +24,8 @@
 | Phase | Description | Statut |
 |-------|-------------|--------|
 | **6** | Production-Ready (sécurité, CI, tests) | 🔄 EN COURS |
-| **7.1** | Filtre temporel (MAGMA-inspired) | ⏳ PLANIFIÉ |
-| **7.2** | Extraction d'entités (MAGMA-inspired) | ⏳ PLANIFIÉ |
+| **7.1** | Filtre temporel (MAGMA-inspired) | ✅ FAIT (01/02/2026) |
+| **7.2** | Extraction d'entités (MAGMA-inspired) | ✅ FAIT (01/02/2026) |
 
 ### Phase 5.5a implémentée (2026-01-18)
 

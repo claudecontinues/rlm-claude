@@ -156,8 +156,8 @@ Basé sur cette checklist, voici ce qu'on devrait ajouter :
 
 | Concept MAGMA | Notre adaptation | Statut | Phase |
 |---------------|------------------|--------|-------|
-| **Graphe temporel** | Filtre `date_from`/`date_to` sur `rlm_search` et `rlm_grep` | ⏳ À faire | 7.1 |
-| **Graphe entités** | Champ `entities: [...]` auto-extrait dans `index.json` | ⏳ À faire | 7.2 |
+| **Graphe temporel** | Filtre `date_from`/`date_to` sur `rlm_search` et `rlm_grep` | ✅ FAIT | 7.1 |
+| **Graphe entités** | Dict typé `entities: {files, versions, modules, tickets, functions}` dans `index.json` | ✅ FAIT | 7.2 |
 
 ### Concepts rejetés
 
@@ -172,8 +172,8 @@ Basé sur cette checklist, voici ce qu'on devrait ajouter :
 
 | Requête | BM25 seul | Avec filtre temporel | Avec entités |
 |---------|-----------|---------------------|--------------|
-| "décisions entre 25 et 30 janvier" | ❌ Retourne 18 janv | ✅ Filtré correctement | — |
-| "tous les bugs website_joyjuice" | ⚠️ Incomplet | — | ✅ Agrégation par entité |
+| "décisions entre 25 et 30 janvier" | ❌ Retourne 18 janv | ✅ Filtré correctement (7.1) | — |
+| "tous les bugs website_joyjuice" | ⚠️ Incomplet | — | ✅ Filtrage `entity="website_joyjuice"` (7.2) |
 | "pourquoi layout produit changé" | ✅ Score 3.70 | — | — |
 
 ---
@@ -194,8 +194,8 @@ Basé sur cette checklist, voici ce qu'on devrait ajouter :
 ## 13. Score de Couverture Mis à Jour
 
 **Concepts paper RLM MIT** : 22/26 = **85%**
-**Concepts MAGMA retenus** : 2/6 = **33%** (les 2 plus utiles)
-**Total concepts planned** : 24/32 = **75%** (focus sur l'utile, pas l'exhaustif)
+**Concepts MAGMA retenus** : 2/6 = **33%** (les 2 plus utiles, tous implémentés)
+**Total concepts implémentés** : 24/32 → **26/32 = 81%** (+2 MAGMA : temporel + entités)
 
 ---
 

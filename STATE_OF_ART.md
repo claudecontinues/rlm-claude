@@ -371,6 +371,11 @@ Test des limites de BM25 sur 100 chunks / 146 insights :
 **Conclusion** : BM25 marche à 80%. Échoue sur requêtes temporelles et agrégation.
 → Décision : implémenter filtre temporel (Phase 7.1) + extraction entités (Phase 7.2).
 
+**Résultat post-implémentation (01/02/2026)** :
+- Phase 7.1 ✅ : `rlm_search("décisions", date_from="2026-01-25", date_to="2026-01-30")` → filtre correctement
+- Phase 7.2 ✅ : `rlm_grep("bug", entity="website_joyjuice")` → filtre par entité
+- 119 tests passent (28 temporel + 36 entités + 55 existants)
+
 ---
 
 ## 7. Implémentations Open Source

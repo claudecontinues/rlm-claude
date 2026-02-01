@@ -518,15 +518,15 @@ Après analyse, **MCP Server + Hooks** est l'approche la plus puissante et pére
 | 6.4 | Robustesse (atomic writes, path traversal, locking) | ✅ FAIT (fileutil.py) |
 | 6.5 | SECURITY.md + vulnerability reporting | ✅ FAIT |
 
-### Phase 7 : MAGMA-Inspired Search Upgrade - PLANIFIÉE
+### Phase 7 : MAGMA-Inspired Search Upgrade - VALIDÉE
 
 > **Source** : [MAGMA (arXiv:2601.03236)](https://arxiv.org/abs/2601.03236) — Upgrade chirurgical, pas réécriture
-> **Décidé** : 01/02/2026
+> **Décidé** : 01/02/2026 | **Complété** : 01/02/2026
 
 | Tâche | Description | Statut |
 |-------|-------------|--------|
-| 7.1 | Filtre temporel (`date_from`/`date_to`) sur `rlm_search` et `rlm_grep` | ⏳ PROCHAINE |
-| 7.2 | Extraction d'entités auto dans `rlm_chunk()` (fichiers, modules, versions) | ⏳ À FAIRE |
+| 7.1 | Filtre temporel (`date_from`/`date_to`) sur `rlm_search` et `rlm_grep` | ✅ FAIT (28 tests) |
+| 7.2 | Extraction d'entités auto dans `rlm_chunk()` (files, versions, modules, tickets, functions) | ✅ FAIT (36 tests) |
 
 ---
 

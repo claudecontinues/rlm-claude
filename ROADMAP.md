@@ -15,6 +15,7 @@
 | **Phase 4** | VALIDEE | Production (auto-summary, dedup, access tracking) |
 | **Phase 5** | VALIDEE | Avance (BM25, fuzzy, multi-sessions, retention) |
 | **Phase 6** | EN COURS | Production-Ready (tests, CI/CD, PyPI) |
+| **Phase 7** | VALIDÉE | MAGMA-Inspired (filtre temporel + extraction entités) |
 
 ---
 
