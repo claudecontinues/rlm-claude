@@ -194,7 +194,8 @@ rlm-claude/
 │       ├── search.py          # BM25 search engine
 │       ├── tokenizer_fr.py    # FR/EN tokenization
 │       ├── sessions.py        # Multi-session management
-│       └── retention.py       # Archive/restore/purge lifecycle
+│       ├── retention.py       # Archive/restore/purge lifecycle
+│       └── fileutil.py        # Safe I/O (atomic writes, path validation, locking)
 │
 ├── hooks/                     # Claude Code hooks
 │   ├── pre_compact_chunk.py   # Auto-save before /compact (PreCompact hook)
@@ -289,6 +290,20 @@ Then configure hooks in `~/.claude/settings.json` (see above).
 ./uninstall.sh --all        # Remove everything
 ./uninstall.sh --dry-run    # Preview what would be removed
 ```
+
+---
+
+## Security
+
+RLM includes built-in protections for safe operation:
+
+- **Path traversal prevention** - Chunk IDs are validated against a strict allowlist (`[a-zA-Z0-9_.-&]`), and resolved paths are verified to stay within the storage directory
+- **Atomic writes** - All JSON and chunk files are written using write-to-temp-then-rename, preventing corruption from interrupted writes or crashes
+- **File locking** - Concurrent read-modify-write operations on shared indexes use `fcntl.flock` exclusive locks
+- **Content size limits** - Chunks are limited to 2 MB, and gzip decompression (archive restore) is capped at 10 MB to prevent resource exhaustion
+- **SHA-256 hashing** - Content deduplication uses SHA-256 (not MD5)
+
+All I/O safety primitives are centralized in `mcp_server/tools/fileutil.py`.
 
 ---
 

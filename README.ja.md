@@ -194,7 +194,8 @@ rlm-claude/
 │       ├── search.py          # BM25検索エンジン
 │       ├── tokenizer_fr.py    # FR/ENトークナイゼーション
 │       ├── sessions.py        # マルチセッション管理
-│       └── retention.py       # アーカイブ/復元/パージのライフサイクル
+│       ├── retention.py       # アーカイブ/復元/パージのライフサイクル
+│       └── fileutil.py        # 安全なI/O（アトミック書き込み、パス検証、ロック）
 │
 ├── hooks/                     # Claude Codeフック
 │   ├── pre_compact_chunk.py   # /compact前の自動保存（PreCompactフック）
@@ -280,6 +281,20 @@ cp templates/skills/rlm-parallel/skill.md ~/.claude/skills/rlm-parallel/
 ```
 
 その後、`~/.claude/settings.json` でフックを設定してください（上記参照）。
+
+---
+
+## セキュリティ
+
+RLMには安全な運用のための保護機能が組み込まれています：
+
+- **パストラバーサル防止** - チャンクIDは厳格なホワイトリスト（`[a-zA-Z0-9_.-&]`）で検証され、解決済みパスがストレージディレクトリ内に留まることを確認
+- **アトミック書き込み** - すべてのJSONファイルとチャンクファイルはwrite-to-temp-then-renameパターンで書き込まれ、中断やクラッシュ時の破損を防止
+- **ファイルロック** - 共有インデックスの並行読み取り-変更-書き込み操作は `fcntl.flock` 排他ロックを使用
+- **コンテンツサイズ制限** - チャンクは2 MBに制限、gzip解凍（アーカイブ復元）はリソース枯渇防止のため10 MBに制限
+- **SHA-256ハッシュ** - コンテンツの重複排除にSHA-256を使用（MD5ではなく）
+
+すべてのI/Oセキュリティプリミティブは `mcp_server/tools/fileutil.py` に集約されています。
 
 ---
 

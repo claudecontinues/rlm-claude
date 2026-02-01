@@ -322,7 +322,8 @@ RLM/
 │       ├── tokenizer_fr.py    # Phase 5.1 (tokenization FR/EN)
 │       ├── search.py          # Phase 5.1 (BM25 search)
 │       ├── sessions.py        # Phase 5.5 (sessions, domains)
-│       └── retention.py       # Phase 5.6 (archive/restore/purge)
+│       ├── retention.py       # Phase 5.6 (archive/restore/purge)
+│       └── fileutil.py        # I/O sécurisé (écritures atomiques, validation chemins, verrous)
 │
 ├── hooks/                     # Phase 3+ (auto-chunking)
 │   ├── pre_compact_chunk.py   # Hook PreCompact - sauvegarde auto avant /compact
@@ -427,6 +428,20 @@ Dans `~/.claude/settings.json` :
 - `PreCompact` crée un chunk automatique avant /compact (manual ou auto)
 - Hook `Stop` supprimé en v0.9.0 (pas de reminders automatiques)
 - L'utilisateur décide quand chunker, le système sauvegarde avant perte
+
+---
+
+## Sécurité
+
+RLM inclut des protections intégrées pour un fonctionnement sûr :
+
+- **Prévention du path traversal** - Les IDs de chunks sont validés par une allowlist stricte (`[a-zA-Z0-9_.-&]`), et les chemins résolus sont vérifiés pour rester dans le répertoire de stockage
+- **Écritures atomiques** - Tous les fichiers JSON et chunks utilisent le pattern write-to-temp-then-rename, empêchant la corruption en cas d'interruption ou de crash
+- **Verrouillage fichier** - Les opérations concurrentes de lecture-modification-écriture sur les index partagés utilisent des verrous exclusifs `fcntl.flock`
+- **Limites de taille** - Les chunks sont limités à 2 Mo, et la décompression gzip (restauration d'archive) est plafonnée à 10 Mo pour prévenir l'épuisement des ressources
+- **Hachage SHA-256** - La déduplication de contenu utilise SHA-256 (pas MD5)
+
+Toutes les primitives de sécurité I/O sont centralisées dans `mcp_server/tools/fileutil.py`.
 
 ---
 
