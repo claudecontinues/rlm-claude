@@ -35,6 +35,14 @@ Claude Codeには**コンテキストウィンドウの制限**があります�
 
 ## クイックインストール
 
+### PyPI経由（推奨）
+
+```bash
+pip install mcp-rlm-server[all]
+```
+
+### Git経由
+
 ```bash
 git clone https://github.com/EncrEor/rlm-claude.git
 cd rlm-claude
@@ -44,6 +52,18 @@ cd rlm-claude
 Claude Codeを再起動すれば完了です。
 
 **必要環境**: Python 3.10+、Claude Code CLI
+
+### v0.9.0以前からのアップグレード
+
+v0.9.1でソースコードが `mcp_server/` から `src/mcp_server/`（PyPAベストプラクティス）に移動しました。互換性のためのシンボリックリンクが含まれていますが、インストーラーの再実行を推奨します：
+
+```bash
+cd rlm-claude
+git pull
+./install.sh          # MCPサーバーパスを再設定
+```
+
+データ（`~/.claude/rlm/`）はそのままです。サーバーパスのみ更新されます。
 
 ---
 
@@ -93,7 +113,7 @@ RLMはClaude Codeの `/compact` イベントにフックします。コンテキ
 - **`rlm_chunk`** - 会話セグメントを永続ストレージに保存
 - **`rlm_peek`** - チャンクを読み取り（全体または行範囲を指定して部分的に）
 - **`rlm_grep`** - 全チャンクにわたる正規表現検索（＋タイプミス耐性のあいまい検索）
-- **`rlm_search`** - BM25ランキング検索（FR/EN対応、アクセント正規化）
+- **`rlm_search`** - ハイブリッド検索：BM25 + セマンティックコサイン類似度（FR/EN対応、アクセント正規化）
 - **`rlm_list_chunks`** - メタデータ付きの全チャンク一覧
 
 ### マルチプロジェクト管理
@@ -114,6 +134,44 @@ RLMはClaude Codeの `/compact` イベントにフックします。コンテキ
 - **PostToolUseフック**: チャンク操作後の統計追跡
 - ユーザー主導の思想: チャンクのタイミングはあなたが決め、システムは消失前に保存
 
+### セマンティック検索（オプション）
+- **ハイブリッドBM25 + コサイン** - キーワードマッチングとベクトル類似度を組み合わせて関連性を向上
+- **自動エンベディング** - 新しいチャンクは作成時に自動的にエンベディングされる
+- **2つのプロバイダー** - Model2Vec（高速、256次元）またはFastEmbed（高精度、384次元）
+- **グレースフルデグラデーション** - セマンティック依存関係がインストールされていない場合、純粋なBM25にフォールバック
+
+#### プロバイダー比較（108チャンクでのベンチマーク）
+
+| | Model2Vec（デフォルト） | FastEmbed |
+|---|---|---|
+| **モデル** | `potion-multilingual-128M` | `paraphrase-multilingual-MiniLM-L12-v2` |
+| **次元数** | 256 | 384 |
+| **108チャンクのエンベディング** | 0.06秒 | 1.30秒 |
+| **検索レイテンシ** | 0.1ms/クエリ | 1.5ms/クエリ |
+| **メモリ** | 0.1 MB | 0.3 MB |
+| **ディスク（モデル）** | ~35 MB | ~230 MB |
+| **セマンティック品質** | 良好（キーワード寄り） | より高精度（真のセマンティック） |
+| **速度** | **21倍高速** | ベースライン |
+
+プロバイダー間のTop-5結果の重複: ~1.6/5（8クエリ中7つで異なる結果）。FastEmbedはよりセマンティックな意味を捉え、Model2Vecはキーワード類似度に寄る傾向があります。ハイブリッドBM25 + コサイン融合が両方の弱点を補います。
+
+**推奨**: Model2Vec（デフォルト）から始めてください。より高いセマンティック精度が必要で、起動の遅さを許容できる場合のみFastEmbedに切り替えてください。
+
+```bash
+# Model2Vec（デフォルト）— 高速、~35 MB
+pip install mcp-rlm-server[semantic]
+
+# FastEmbed — より高精度、~230 MB、低速
+pip install mcp-rlm-server[semantic-fastembed]
+export RLM_EMBEDDING_PROVIDER=fastembed
+
+# 自分のデータで両プロバイダーを比較
+python3 scripts/benchmark_providers.py
+
+# 既存チャンクのバックフィル（インストール後に一度実行）
+python3 scripts/backfill_embeddings.py
+```
+
 ### サブエージェントスキル
 - **`/rlm-analyze`** - 隔離されたサブエージェントで単一チャンクを分析
 - **`/rlm-parallel`** - 複数チャンクを並列分析（MIT RLM論文のMap-Reduceパターン）
@@ -127,7 +185,7 @@ RLMはClaude Codeの `/compact` イベントにフックします。コンテキ
 | 永続メモリ | なし | あり | **あり** |
 | Claude Codeで動作 | N/A | いいえ（独自ランタイム） | **ネイティブMCP** |
 | コンパクト前の自動保存 | なし | N/A | **あり（フック）** |
-| 検索（正規表現 + BM25） | なし | 基本的 | **あり** |
+| 検索（正規表現 + BM25 + セマンティック） | なし | 基本的 | **あり** |
 | あいまい検索（タイプミス耐性） | なし | なし | **あり** |
 | マルチプロジェクト対応 | なし | なし | **あり** |
 | スマートリテンション（アーカイブ/パージ） | なし | 基本的 | **あり** |
@@ -162,7 +220,7 @@ rlm_chunk("API再設計についての議論... [長いコンテンツ]",
           tags="api,architecture")
 
 # 全履歴を横断検索
-rlm_search("APIアーキテクチャの決定事項")      # BM25ランキング
+rlm_search("APIアーキテクチャの決定事項")      # BM25 + セマンティックランキング
 rlm_grep("authentication", fuzzy=True)          # タイプミス耐性
 
 # 特定のチャンクを読み取り
@@ -186,15 +244,17 @@ rlm_sessions(project="MyApp")
 
 ```
 rlm-claude/
-├── mcp_server/
+├── src/mcp_server/
 │   ├── server.py              # MCPサーバー（14ツール）
 │   └── tools/
 │       ├── memory.py          # インサイト（remember/recall/forget）
 │       ├── navigation.py      # チャンク（chunk/peek/grep/list）
-│       ├── search.py          # BM25検索エンジン
+│       ├── search.py          # BM25 + セマンティック検索エンジン
 │       ├── tokenizer_fr.py    # FR/ENトークナイゼーション
 │       ├── sessions.py        # マルチセッション管理
 │       ├── retention.py       # アーカイブ/復元/パージのライフサイクル
+│       ├── embeddings.py      # エンベディングプロバイダー（Model2Vec、FastEmbed）
+│       ├── vecstore.py        # ベクトルストア（.npz）セマンティック検索用
 │       └── fileutil.py        # 安全なI/O（アトミック書き込み、パス検証、ロック）
 │
 ├── hooks/                     # Claude Codeフック
@@ -211,6 +271,7 @@ rlm-claude/
 │   ├── index.json             # チャンクインデックス
 │   ├── chunks/                # 会話履歴
 │   ├── archive/               # 圧縮アーカイブ（.gz）
+│   ├── embeddings.npz         # セマンティックベクトル（フェーズ8）
 │   └── sessions.json          # セッションインデックス
 │
 ├── install.sh                 # ワンコマンドインストーラー
@@ -270,8 +331,8 @@ rlm-claude/
 手動でインストールする場合：
 
 ```bash
-pip install -r mcp_server/requirements.txt
-claude mcp add rlm-server -- python3 $(pwd)/mcp_server/server.py
+pip install -e ".[all]"
+claude mcp add rlm-server -- python3 -m mcp_server
 mkdir -p ~/.claude/rlm/hooks
 cp hooks/*.py ~/.claude/rlm/hooks/
 chmod +x ~/.claude/rlm/hooks/*.py
@@ -281,6 +342,15 @@ cp templates/skills/rlm-parallel/skill.md ~/.claude/skills/rlm-parallel/
 ```
 
 その後、`~/.claude/settings.json` でフックを設定してください（上記参照）。
+
+## アンインストール
+
+```bash
+./uninstall.sh              # インタラクティブ（データの保持/削除を選択）
+./uninstall.sh --keep-data  # RLM設定を削除、チャンク/インサイトは保持
+./uninstall.sh --all        # すべて削除
+./uninstall.sh --dry-run    # 削除対象のプレビュー
+```
 
 ---
 
@@ -305,7 +375,7 @@ RLMには安全な運用のための保護機能が組み込まれています�
 ```bash
 claude mcp list                    # サーバーを確認
 claude mcp remove rlm-server       # 存在する場合は削除
-claude mcp add rlm-server -- python3 /path/to/mcp_server/server.py
+claude mcp add rlm-server -- python3 -m mcp_server
 ```
 
 ### 「フックが動作しない」
@@ -324,16 +394,27 @@ ls ~/.claude/rlm/hooks/                                  # インストール済
 - [x] **フェーズ3**: 自動チャンキング＋サブエージェントスキル
 - [x] **フェーズ4**: プロダクション（自動要約、重複排除、アクセス追跡）
 - [x] **フェーズ5**: 高度な機能（BM25検索、あいまいgrep、マルチセッション、リテンション）
-- [ ] **フェーズ6**: プロダクションレディ（テスト、CI/CD、PyPI）
+- [x] **フェーズ6**: プロダクションレディ（テスト、CI/CD、PyPI）
+- [x] **フェーズ7**: MAGMA対応（時間フィルタリング、エンティティ抽出）
+- [x] **フェーズ8**: ハイブリッドセマンティック検索（BM25 + コサイン、Model2Vec）
 
 ---
 
 ## インスピレーション
 
-- [RLM論文 (MIT CSAIL)](https://arxiv.org/abs/2512.24601) - Zhang et al., 2025年12月 - "Recursive Language Models"
-- [Letta/MemGPT](https://github.com/letta-ai/letta) - AIエージェントメモリフレームワーク
-- [MCP仕様](https://modelcontextprotocol.io/specification)
-- [Claude Codeフック](https://docs.anthropic.com/claude-code/hooks)
+### 研究論文
+- [RLM論文 (MIT CSAIL)](https://arxiv.org/abs/2512.24601) - Zhang et al., 2025年12月 - "Recursive Language Models" — 基盤アーキテクチャ（chunk/peek/grep、サブエージェント分析）
+- [MAGMA (arXiv:2601.03236)](https://arxiv.org/abs/2601.03236) - 2026年1月 - "Memory-Augmented Generation with Memory Agents" — 時間フィルタリング、エンティティ抽出（Phase 7）
+
+### ライブラリ & ツール
+- [Model2Vec](https://github.com/MinishLab/model2vec) - 高速セマンティック検索用静的埋め込み（Phase 8）
+- [BM25S](https://github.com/xhluca/bm25s) - Python純粋実装の高速BM25（Phase 5）
+- [FastEmbed](https://github.com/qdrant/fastembed) - ONNXベースの埋め込み、オプションプロバイダー（Phase 8）
+- [Letta/MemGPT](https://github.com/letta-ai/letta) - AIエージェントメモリフレームワーク — 初期インスピレーション
+
+### 標準 & プラットフォーム
+- [MCP仕様](https://modelcontextprotocol.io/specification) - Model Context Protocol
+- [Claude Codeフック](https://docs.anthropic.com/claude-code/hooks) - PreCompact / PostToolUseフック
 
 ---
 

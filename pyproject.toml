@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "mcp-rlm-server"
-version = "0.9.1"
+version = "0.9.2"
 description = "Infinite memory for Claude Code - MCP server inspired by MIT RLM paper"
 readme = "README.md"
 license = "MIT"
@@ -46,6 +46,14 @@ search = [
 fuzzy = [
     "thefuzz>=0.22.1",
 ]
+semantic = [
+    "model2vec>=0.4.0",
+    "numpy>=1.24.0",
+]
+semantic-fastembed = [
+    "fastembed>=0.5.0",
+    "numpy>=1.24.0",
+]
 dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.24",
@@ -53,7 +61,7 @@ dev = [
     "ruff>=0.1.0",
 ]
 all = [
-    "mcp-rlm-server[search,fuzzy,dev]",
+    "mcp-rlm-server[search,fuzzy,semantic,dev]",
 ]
 
 [project.scripts]

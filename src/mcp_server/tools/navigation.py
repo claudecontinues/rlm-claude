@@ -631,6 +631,21 @@ format_version: "2.0"
     index["total_tokens_estimate"] = sum(c["tokens_estimate"] for c in index["chunks"])
     _save_index(index)
 
+    # Phase 8: Generate embedding if semantic search available
+    try:
+        from .embeddings import _get_cached_provider
+        from .vecstore import VectorStore
+
+        provider = _get_cached_provider()
+        if provider is not None:
+            vec = provider.embed([content])[0]
+            store = VectorStore()
+            store.load()
+            store.add(chunk_id, vec)
+            store.save()
+    except Exception:
+        pass  # Semantic is optional, never block chunk creation
+
     # Phase 5.5: Register session and link chunk
     if resolved_project:
         # Create or get session for this project/domain combo

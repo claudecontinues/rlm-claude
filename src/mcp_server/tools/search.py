@@ -8,6 +8,7 @@ Uses BM25S library (500x faster than rank_bm25) for efficient scoring.
 
 Phase 5.1 implementation.
 Phase 5.5c: Added project/domain filtering.
+Phase 8: Hybrid search (BM25 + cosine similarity) when semantic deps available.
 """
 
 import json
@@ -182,6 +183,72 @@ class RLMSearch:
         return output
 
 
+# =============================================================================
+# PHASE 8: Hybrid Search (BM25 + Cosine Similarity)
+# =============================================================================
+
+HYBRID_ALPHA = 0.6  # Weight for semantic score (0.6 semantic, 0.4 BM25)
+
+
+def _normalize_bm25_scores(results: list[dict]) -> list[dict]:
+    """Normalize BM25 scores to [0, 1] range using min-max scaling.
+
+    Adds a 'score_norm' field to each result dict.
+
+    Args:
+        results: List of BM25 result dicts with 'score' field
+
+    Returns:
+        Same list with 'score_norm' added to each dict
+    """
+    if not results:
+        return results
+
+    scores = [r["score"] for r in results]
+    min_score = min(scores)
+    max_score = max(scores)
+    score_range = max_score - min_score
+
+    for r in results:
+        if score_range > 0:
+            r["score_norm"] = (r["score"] - min_score) / score_range
+        else:
+            r["score_norm"] = 1.0  # All scores equal → all get 1.0
+
+    return results
+
+
+def _hybrid_search(query: str, top_k: int) -> list[tuple[str, float]] | None:
+    """Perform semantic vector search if available.
+
+    Returns None if semantic search is not available (deps missing),
+    allowing the caller to fall back to BM25-only.
+
+    Args:
+        query: Natural language search query
+        top_k: Maximum number of results
+
+    Returns:
+        List of (chunk_id, score) tuples with scores in [0,1], or None
+    """
+    try:
+        from .embeddings import _get_cached_provider
+        from .vecstore import VectorStore
+
+        provider = _get_cached_provider()
+        if provider is None:
+            return None
+
+        store = VectorStore()
+        if not store.load():
+            return None
+
+        query_vec = provider.embed([query])[0]
+        return store.search(query_vec, top_k=top_k)
+    except Exception:
+        return None
+
+
 def search(
     query: str,
     limit: int = 5,
@@ -219,6 +286,32 @@ def search(
         results = searcher.search(query, top_k=limit * 3)
     except ImportError as e:
         return {"status": "error", "message": str(e), "results": []}
+
+    # Phase 8: Hybrid fusion if semantic available
+    semantic_hits = _hybrid_search(query, limit * 3)
+    if semantic_hits is not None and results:
+        results = _normalize_bm25_scores(results)
+        bm25_map = {r["chunk_id"]: r.get("score_norm", 0) for r in results}
+        sem_map = dict(semantic_hits)
+        all_ids = set(bm25_map) | set(sem_map)
+        fused = []
+        for cid in all_ids:
+            score = (1 - HYBRID_ALPHA) * bm25_map.get(cid, 0) + HYBRID_ALPHA * sem_map.get(cid, 0)
+            fused.append(
+                {
+                    "chunk_id": cid,
+                    "score": score,
+                    "summary": searcher.chunk_summaries.get(cid, ""),
+                }
+            )
+        fused.sort(key=lambda x: x["score"], reverse=True)
+        results = fused
+    elif semantic_hits is not None:
+        # BM25 returned nothing but semantic has results
+        results = [
+            {"chunk_id": cid, "score": s, "summary": searcher.chunk_summaries.get(cid, "")}
+            for cid, s in semantic_hits
+        ]
 
     # Phase 5.5c + 7.1 + 7.2: Filter by project/domain/date/entity if specified
     has_filters = project or domain or date_from or date_to or entity

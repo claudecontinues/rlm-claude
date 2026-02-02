@@ -153,6 +153,22 @@ def rlm_status() -> str:
     elif chunks_result["total_chunks"] > 0:
         access_stats = "\n  No chunks accessed yet\n"
 
+    # Phase 8: Semantic status
+    semantic_line = ""
+    try:
+        from mcp_server.tools.embeddings import _get_cached_provider
+        from mcp_server.tools.vecstore import VectorStore
+
+        provider = _get_cached_provider()
+        if provider is not None:
+            store = VectorStore()
+            store.load()
+            semantic_line = f"Semantic: {type(provider).__name__} ({len(store.chunk_ids)}/{chunks_result['total_chunks']} embedded)\n"
+        else:
+            semantic_line = "Semantic: not installed (pip install mcp-rlm-server[semantic])\n"
+    except Exception:
+        semantic_line = "Semantic: not available\n"
+
     return (
         f"RLM Memory Status (v{mem_result['version']})\n"
         f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
@@ -161,6 +177,7 @@ def rlm_status() -> str:
         f"  By importance: {importance_str}\n"
         f"Chunks: {chunks_result['total_chunks']} (~{chunks_result['total_tokens_estimate']} tokens)\n"
         f"  Total accesses: {total_accesses}{access_stats}"
+        f"{semantic_line}"
         f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
         f"Created: {mem_result['created_at'][:16] if mem_result['created_at'] else 'N/A'}\n"
         f"Last updated: {mem_result['last_updated'][:16] if mem_result['last_updated'] else 'never'}"

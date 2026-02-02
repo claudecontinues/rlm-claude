@@ -5,6 +5,42 @@ All notable changes to RLM are documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.2] - 2026-02-02
+
+### Added — Phase 8: Hybrid Semantic Search (COMPLETE)
+- `embeddings.py` — Abstract `EmbeddingProvider` with two implementations:
+  - `Model2VecProvider`: `minishlab/potion-multilingual-128M` (256 dim, fast)
+  - `FastEmbedProvider`: `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` (384 dim, accurate)
+- `vecstore.py` — Numpy-based vector store (`.npz`), brute-force cosine similarity
+- Hybrid fusion in `search.py` — BM25 scores normalized [0,1] + cosine scores, alpha=0.6
+- Auto-embedding on `rlm_chunk()` — embedding generated at creation time (silent fail if unavailable)
+- Semantic status in `rlm_status()` — shows provider name and embedded/total counts
+- `scripts/backfill_embeddings.py` — retroactively embed existing chunks (`--dry-run` support)
+- 18 tests in `tests/test_semantic.py` (VectorStore, normalization, fusion, graceful degradation)
+- Provider selection via `RLM_EMBEDDING_PROVIDER` env var (default: `model2vec`)
+
+### Changed
+- `pyproject.toml` version bump to 0.9.2
+- New optional dependencies: `semantic` (model2vec+numpy), `semantic-fastembed` (fastembed+numpy)
+- `all` extra now includes `semantic`
+
+### Backward compatibility
+- **100% backward compatible** — without `model2vec` installed, search falls back to pure BM25
+- No changes to existing tool signatures or behavior
+- Existing chunks work unchanged; run `backfill_embeddings.py` to add vectors
+
+### Install
+```bash
+# New install (with semantic)
+pip install mcp-rlm-server[all]
+
+# Add semantic to existing install
+pip install mcp-rlm-server[semantic]
+
+# Backfill existing chunks
+python3 scripts/backfill_embeddings.py
+```
+
 ## [0.9.1] - 2026-02-01
 
 ### Changed — Phase 6: PyPI Distribution

@@ -1,7 +1,7 @@
 # RLM - Roadmap
 
 > Pistes futures pour RLM - Memoire infinie pour Claude Code
-> **Derniere MAJ** : 2026-02-01 (v0.9.1 - PyPI Distribution)
+> **Derniere MAJ** : 2026-02-02 (v0.9.2 - Hybrid Semantic Search)
 
 ---
 
@@ -16,6 +16,7 @@
 | **Phase 5** | VALIDEE | Avance (BM25, fuzzy, multi-sessions, retention) |
 | **Phase 6** | VALIDÉE | Production-Ready (tests, CI/CD, PyPI) |
 | **Phase 7** | VALIDÉE | MAGMA-Inspired (filtre temporel + extraction entités) |
+| **Phase 8** | VALIDÉE | Hybrid Semantic Search (BM25 + cosine, model2vec) |
 
 ---
 
@@ -342,15 +343,10 @@ Alternative si performance critique : `rapidfuzz` (Cython, 10x plus rapide).
 **Implementation** : Task tools paralleles (natif Claude Code, $0)
 **Note** : MCP Sampling non supporte par Claude Code (issue #1785) → Skill = seule option
 
-### 5.4 Embeddings (BACKUP)
+### 5.4 Embeddings (BACKUP) → Implémenté en Phase 8
 
-**Activer SEULEMENT SI** : BM25 < 70% precision ou queries semantiques pures echouent.
-
-| Tache | Description | Priorite |
-|-------|-------------|----------|
-| Nomic Embed v2 MoE | Modele multilingue leger | P3 |
-| LanceDB | Stockage vectoriel Rust | P3 |
-| Dimensions Matryoshka | 384 dims (tronque de 768) | P3 |
+**Statut** : FAIT (v0.9.2) — Approche hybride BM25 + cosine retenue.
+Voir Phase 8 ci-dessous pour les détails.
 
 ### 5.5 Multi-sessions - COMPLETE
 
@@ -1237,6 +1233,74 @@ ruff format mcp_server/
 | 6.5 Documentation | 1 session | CHANGELOG + README |
 
 **Total MVP+ : 5-6 sessions**
+
+---
+
+## Phase 8 : Hybrid Semantic Search - FAIT (v0.9.2)
+
+**Objectif** : Améliorer la recherche avec des embeddings vectoriels en complément de BM25.
+
+**Implémenté le 2026-02-02** :
+
+### Architecture
+
+```
+rlm_search("problème de performance")
+         │
+         ├── BM25 (keyword)  ──→ scores normalisés [0,1]
+         │                         × (1 - α) = 0.4
+         │
+         ├── Cosine (semantic) ──→ scores [0,1]
+         │                         × α = 0.6
+         │
+         └── Fusion ──→ résultats triés par score combiné
+```
+
+### Fichiers créés
+
+| Fichier | Description |
+|---------|-------------|
+| `src/mcp_server/tools/embeddings.py` | Providers abstraits + Model2Vec + FastEmbed |
+| `src/mcp_server/tools/vecstore.py` | Stockage numpy `.npz`, cosine brute-force |
+| `scripts/backfill_embeddings.py` | Backfill chunks existants |
+| `tests/test_semantic.py` | 18 tests |
+
+### Providers
+
+| Provider | Modèle | Dimensions | Vitesse |
+|----------|--------|------------|---------|
+| **Model2VecProvider** (défaut) | `minishlab/potion-multilingual-128M` | 256 | Très rapide |
+| FastEmbedProvider | `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` | 384 | Plus précis |
+
+Sélection via `RLM_EMBEDDING_PROVIDER=model2vec|fastembed`.
+
+### Dégradation gracieuse
+
+- Sans `model2vec` installé → BM25 pur (aucun changement)
+- `_hybrid_search()` retourne `None` → fusion ignorée
+- Auto-embedding sur `rlm_chunk()` dans un `try/except` → ne bloque jamais
+
+### Installation
+
+```bash
+pip install mcp-rlm-server[semantic]     # model2vec + numpy
+pip install mcp-rlm-server[semantic-fastembed]  # fastembed + numpy
+python3 scripts/backfill_embeddings.py   # retroactif
+```
+
+### Checklist Phase 8
+
+| Tâche | Statut |
+|-------|--------|
+| `EmbeddingProvider` abstrait + 2 implémentations | FAIT |
+| `VectorStore` (add/remove/search/save/load) | FAIT |
+| Fusion hybride dans `search()` (alpha=0.6) | FAIT |
+| Auto-embedding dans `chunk()` | FAIT |
+| Semantic status dans `rlm_status()` | FAIT |
+| `backfill_embeddings.py` script | FAIT |
+| 18 tests (sans model2vec requis) | FAIT |
+| `pyproject.toml` optional deps | FAIT |
+| Backfill 106 chunks existants | FAIT |
 
 ---
 

@@ -113,7 +113,7 @@ RLM hooks into Claude Code's `/compact` event. Before your context is wiped, RLM
 - **`rlm_chunk`** - Save conversation segments to persistent storage
 - **`rlm_peek`** - Read a chunk (full or partial by line range)
 - **`rlm_grep`** - Regex search across all chunks (+ fuzzy matching for typo tolerance)
-- **`rlm_search`** - BM25 ranked search (FR/EN, accent-normalized)
+- **`rlm_search`** - Hybrid search: BM25 + semantic cosine similarity (FR/EN, accent-normalized)
 - **`rlm_list_chunks`** - List all chunks with metadata
 
 ### Multi-Project Organization
@@ -134,6 +134,44 @@ RLM hooks into Claude Code's `/compact` event. Before your context is wiped, RLM
 - **PostToolUse hook**: Stats tracking after chunk operations
 - User-driven philosophy: you decide when to chunk, the system saves before loss
 
+### Semantic Search (optional)
+- **Hybrid BM25 + cosine** - Combines keyword matching with vector similarity for better relevance
+- **Auto-embedding** - New chunks are automatically embedded at creation time
+- **Two providers** - Model2Vec (fast, 256d) or FastEmbed (accurate, 384d)
+- **Graceful degradation** - Falls back to pure BM25 when semantic deps are not installed
+
+#### Provider comparison (benchmark on 108 chunks)
+
+| | Model2Vec (default) | FastEmbed |
+|---|---|---|
+| **Model** | `potion-multilingual-128M` | `paraphrase-multilingual-MiniLM-L12-v2` |
+| **Dimensions** | 256 | 384 |
+| **Embed 108 chunks** | 0.06s | 1.30s |
+| **Search latency** | 0.1ms/query | 1.5ms/query |
+| **Memory** | 0.1 MB | 0.3 MB |
+| **Disk (model)** | ~35 MB | ~230 MB |
+| **Semantic quality** | Good (keyword-biased) | Better (true semantic) |
+| **Speed** | **21x faster** | Baseline |
+
+Top-5 result overlap between providers: ~1.6/5 (different results in 7/8 queries). FastEmbed captures more semantic meaning while Model2Vec leans toward keyword similarity. The hybrid BM25 + cosine fusion compensates for both weaknesses.
+
+**Recommendation**: Start with Model2Vec (default). Switch to FastEmbed only if you need better semantic accuracy and can afford the slower startup.
+
+```bash
+# Model2Vec (default) — fast, ~35 MB
+pip install mcp-rlm-server[semantic]
+
+# FastEmbed — more accurate, ~230 MB, slower
+pip install mcp-rlm-server[semantic-fastembed]
+export RLM_EMBEDDING_PROVIDER=fastembed
+
+# Compare both providers on your data
+python3 scripts/benchmark_providers.py
+
+# Backfill existing chunks (run once after install)
+python3 scripts/backfill_embeddings.py
+```
+
 ### Sub-Agent Skills
 - **`/rlm-analyze`** - Analyze a single chunk with an isolated sub-agent
 - **`/rlm-parallel`** - Analyze multiple chunks in parallel (Map-Reduce pattern from MIT RLM paper)
@@ -147,7 +185,7 @@ RLM hooks into Claude Code's `/compact` event. Before your context is wiped, RLM
 | Persistent memory | No | Yes | **Yes** |
 | Works with Claude Code | N/A | No (own runtime) | **Native MCP** |
 | Auto-save before compact | No | N/A | **Yes (hooks)** |
-| Search (regex + BM25) | No | Basic | **Yes** |
+| Search (regex + BM25 + semantic) | No | Basic | **Yes** |
 | Fuzzy search (typo-tolerant) | No | No | **Yes** |
 | Multi-project support | No | No | **Yes** |
 | Smart retention (archive/purge) | No | Basic | **Yes** |
@@ -215,6 +253,8 @@ rlm-claude/
 │       ├── tokenizer_fr.py    # FR/EN tokenization
 │       ├── sessions.py        # Multi-session management
 │       ├── retention.py       # Archive/restore/purge lifecycle
+│       ├── embeddings.py      # Embedding providers (Model2Vec, FastEmbed)
+│       ├── vecstore.py        # Vector store (.npz) for semantic search
 │       └── fileutil.py        # Safe I/O (atomic writes, path validation, locking)
 │
 ├── hooks/                     # Claude Code hooks
@@ -231,6 +271,7 @@ rlm-claude/
 │   ├── index.json             # Chunk index
 │   ├── chunks/                # Conversation history
 │   ├── archive/               # Compressed archives (.gz)
+│   ├── embeddings.npz         # Semantic vectors (Phase 8)
 │   └── sessions.json          # Session index
 │
 ├── install.sh                 # One-command installer
@@ -354,15 +395,26 @@ ls ~/.claude/rlm/hooks/                                  # Check installed hooks
 - [x] **Phase 4**: Production (auto-summary, dedup, access tracking)
 - [x] **Phase 5**: Advanced (BM25 search, fuzzy grep, multi-sessions, retention)
 - [x] **Phase 6**: Production-ready (tests, CI/CD, PyPI)
+- [x] **Phase 7**: MAGMA-inspired (temporal filtering, entity extraction)
+- [x] **Phase 8**: Hybrid semantic search (BM25 + cosine, Model2Vec)
 
 ---
 
 ## Inspired By
 
-- [RLM Paper (MIT CSAIL)](https://arxiv.org/abs/2512.24601) - Zhang et al., Dec 2025 - "Recursive Language Models"
-- [Letta/MemGPT](https://github.com/letta-ai/letta) - AI agent memory framework
-- [MCP Specification](https://modelcontextprotocol.io/specification)
-- [Claude Code Hooks](https://docs.anthropic.com/claude-code/hooks)
+### Research Papers
+- [RLM Paper (MIT CSAIL)](https://arxiv.org/abs/2512.24601) - Zhang et al., Dec 2025 - "Recursive Language Models" — foundational architecture (chunk/peek/grep, sub-agent analysis)
+- [MAGMA (arXiv:2601.03236)](https://arxiv.org/abs/2601.03236) - Jan 2026 - "Memory-Augmented Generation with Memory Agents" — temporal filtering, entity extraction (Phase 7)
+
+### Libraries & Tools
+- [Model2Vec](https://github.com/MinishLab/model2vec) - Static word embeddings for fast semantic search (Phase 8)
+- [BM25S](https://github.com/xhluca/bm25s) - Fast BM25 implementation in pure Python (Phase 5)
+- [FastEmbed](https://github.com/qdrant/fastembed) - ONNX-based embeddings, optional provider (Phase 8)
+- [Letta/MemGPT](https://github.com/letta-ai/letta) - AI agent memory framework — early inspiration
+
+### Standards & Platform
+- [MCP Specification](https://modelcontextprotocol.io/specification) - Model Context Protocol
+- [Claude Code Hooks](https://docs.anthropic.com/claude-code/hooks) - PreCompact / PostToolUse hooks
 
 ---
 
