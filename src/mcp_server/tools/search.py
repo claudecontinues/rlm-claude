@@ -55,11 +55,14 @@ class RLMSearch:
         """
         Extract content from a chunk file, skipping YAML header.
 
+        Phase 8.1: Prepends summary, tags, project, and domain from the
+        YAML header so BM25 can match on metadata keywords too.
+
         Args:
             chunk_file: Path to the chunk .md file
 
         Returns:
-            Content string without YAML header
+            Content string with metadata keywords prepended
         """
         with open(chunk_file, encoding="utf-8") as f:
             content = f.read()
@@ -77,7 +80,32 @@ class RLMSearch:
                     content_start = i + 1
                     break
 
-        return "\n".join(lines[content_start:])
+        body = "\n".join(lines[content_start:])
+
+        # Phase 8.1: Prepend metadata to boost keyword matching
+        meta_parts = []
+        for line in lines[:content_start]:
+            if line.startswith("summary:"):
+                val = line.split(":", 1)[1].strip()
+                if val:
+                    meta_parts.append(val)
+            elif line.startswith("tags:"):
+                val = line.split(":", 1)[1].strip().replace(",", " ")
+                if val:
+                    meta_parts.append(val)
+            elif line.startswith("project:"):
+                val = line.split(":", 1)[1].strip()
+                if val:
+                    meta_parts.append(val)
+            elif line.startswith("domain:"):
+                val = line.split(":", 1)[1].strip()
+                if val:
+                    meta_parts.append(val)
+
+        if meta_parts:
+            body = " ".join(meta_parts) + "\n" + body
+
+        return body
 
     def _extract_summary(self, chunk_file: Path) -> str:
         """

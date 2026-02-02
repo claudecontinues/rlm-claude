@@ -4,6 +4,7 @@ Tests for Phase 8: Semantic Search (Hybrid BM25 + Cosine).
 Tests work WITHOUT model2vec installed — uses numpy directly for vector operations.
 """
 
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -285,3 +286,83 @@ class TestGracefulDegradation:
         # Reset state after test
         emb_module._provider_loaded = False
         emb_module._cached_provider = None
+
+
+# =============================================================================
+# Phase 8.1: Metadata-Boosted Search Tests
+# =============================================================================
+
+
+class TestMetadataBoostedSearch:
+    """Test that YAML metadata improves BM25 search ranking."""
+
+    def _write_chunk(self, chunks_dir: Path, filename: str, content: str):
+        chunks_dir.mkdir(parents=True, exist_ok=True)
+        (chunks_dir / filename).write_text(content, encoding="utf-8")
+
+    def test_extract_content_includes_metadata(self, tmp_path):
+        """_extract_content should prepend summary, tags, project, domain."""
+        from mcp_server.tools.search import RLMSearch
+
+        chunks_dir = tmp_path / "chunks"
+        self._write_chunk(
+            chunks_dir,
+            "test_chunk.md",
+            "---\nsummary: Business plan financier\ntags: bp, finance\n"
+            "project: JoyJuice\ndomain: bp\n---\n\nContenu sur la trésorerie.",
+        )
+
+        searcher = RLMSearch(chunks_dir=chunks_dir)
+        content = searcher._extract_content(chunks_dir / "test_chunk.md")
+
+        # Metadata keywords should appear in the extracted content
+        assert "Business plan financier" in content
+        assert "bp" in content
+        assert "finance" in content
+        assert "JoyJuice" in content
+        # Original body should still be there
+        assert "trésorerie" in content
+
+    def test_extract_content_no_metadata(self, tmp_path):
+        """_extract_content with no YAML header returns body as-is."""
+        from mcp_server.tools.search import RLMSearch
+
+        chunks_dir = tmp_path / "chunks"
+        self._write_chunk(chunks_dir, "plain.md", "Just plain text without header.")
+
+        searcher = RLMSearch(chunks_dir=chunks_dir)
+        content = searcher._extract_content(chunks_dir / "plain.md")
+
+        assert "Just plain text without header." in content
+
+    def test_metadata_boosts_bm25_ranking(self, tmp_path):
+        """Chunk with 'bp' in tags should rank higher for query 'BP' than chunk without."""
+        bm25s = pytest.importorskip("bm25s")
+        from mcp_server.tools.search import RLMSearch
+
+        chunks_dir = tmp_path / "chunks"
+
+        # Chunk A: has 'bp' in tags but body talks about treasury
+        self._write_chunk(
+            chunks_dir,
+            "chunk_a.md",
+            "---\nsummary: Analyse trésorerie\ntags: bp, finance\n"
+            "project: JoyJuice\ndomain: bp\n---\n\nDétail du flux de trésorerie mensuel.",
+        )
+
+        # Chunk B: no bp metadata, body mentions unrelated topic
+        self._write_chunk(
+            chunks_dir,
+            "chunk_b.md",
+            "---\nsummary: Installation serveur\ntags: infra, vps\n"
+            "project: JoyJuice\ndomain: infra\n---\n\nConfiguration nginx et SSL.",
+        )
+
+        searcher = RLMSearch(chunks_dir=chunks_dir)
+        searcher.build_index()
+
+        results = searcher.search("BP finance", top_k=2)
+
+        # chunk_a should rank first because 'bp' and 'finance' are in its metadata
+        assert len(results) >= 1
+        assert results[0]["chunk_id"] == "chunk_a"

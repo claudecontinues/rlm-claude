@@ -7,6 +7,13 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [0.9.2] - 2026-02-02
 
+### Fixed — Phase 8.1: Metadata-boosted search
+- `search.py` `_extract_content()` now prepends summary, tags, project, domain to indexed text
+  so BM25 matches on metadata keywords (e.g. query "BP" finds chunks tagged `domain: bp`)
+- `navigation.py` `chunk()` enriches text with summary + tags before embedding
+- `backfill_embeddings.py` applies the same metadata enrichment when re-embedding existing chunks
+- 3 new tests in `test_semantic.py` (`TestMetadataBoostedSearch`)
+
 ### Added — Phase 8: Hybrid Semantic Search (COMPLETE)
 - `embeddings.py` — Abstract `EmbeddingProvider` with two implementations:
   - `Model2VecProvider`: `minishlab/potion-multilingual-128M` (256 dim, fast)

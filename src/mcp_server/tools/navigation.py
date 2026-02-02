@@ -632,13 +632,19 @@ format_version: "2.0"
     _save_index(index)
 
     # Phase 8: Generate embedding if semantic search available
+    # Phase 8.1: Enrich text with metadata for better semantic matching
     try:
         from .embeddings import _get_cached_provider
         from .vecstore import VectorStore
 
         provider = _get_cached_provider()
         if provider is not None:
-            vec = provider.embed([content])[0]
+            embed_text = content
+            if summary:
+                embed_text = f"{summary}\n{embed_text}"
+            if tags:
+                embed_text = f"{', '.join(tags)}\n{embed_text}"
+            vec = provider.embed([embed_text])[0]
             store = VectorStore()
             store.load()
             store.add(chunk_id, vec)

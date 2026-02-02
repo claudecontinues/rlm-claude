@@ -28,7 +28,11 @@ CHUNKS_DIR = CONTEXT_DIR / "chunks"
 
 
 def extract_content(chunk_file: Path) -> str:
-    """Extract content from a chunk file, skipping YAML header."""
+    """Extract content from a chunk file, enriched with YAML metadata.
+
+    Phase 8.1: Prepends summary and tags from YAML header to improve
+    embedding quality (same enrichment as navigation.py and search.py).
+    """
     text = chunk_file.read_text(encoding="utf-8")
     lines = text.split("\n")
     content_start = 0
@@ -42,7 +46,23 @@ def extract_content(chunk_file: Path) -> str:
                 content_start = i + 1
                 break
 
-    return "\n".join(lines[content_start:])
+    body = "\n".join(lines[content_start:])
+
+    # Phase 8.1: Enrich with metadata for better embeddings
+    summary = ""
+    tags = ""
+    for line in lines[:content_start]:
+        if line.startswith("summary:"):
+            summary = line.split(":", 1)[1].strip()
+        elif line.startswith("tags:"):
+            tags = line.split(":", 1)[1].strip()
+
+    if summary:
+        body = f"{summary}\n{body}"
+    if tags:
+        body = f"{tags}\n{body}"
+
+    return body
 
 
 def main():
