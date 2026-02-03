@@ -108,7 +108,7 @@ RLM hooks into Claude Code's `/compact` event. Before your context is wiped, RLM
 
 ### Memory & Insights
 - **`rlm_remember`** - Save decisions, facts, preferences with categories and importance levels
-- **`rlm_recall`** - Search insights by keyword, category, or importance
+- **`rlm_recall`** - Search insights by keyword (multi-word tokenized), category, or importance
 - **`rlm_forget`** - Remove an insight
 - **`rlm_status`** - System overview (insight count, chunk stats, access metrics)
 
@@ -116,7 +116,7 @@ RLM hooks into Claude Code's `/compact` event. Before your context is wiped, RLM
 - **`rlm_chunk`** - Save conversation segments to persistent storage
 - **`rlm_peek`** - Read a chunk (full or partial by line range)
 - **`rlm_grep`** - Regex search across all chunks (+ fuzzy matching for typo tolerance)
-- **`rlm_search`** - Hybrid search: BM25 + semantic cosine similarity (FR/EN, accent-normalized)
+- **`rlm_search`** - Hybrid search: BM25 + semantic cosine similarity (FR/EN, accent-normalized, chunks + insights)
 - **`rlm_list_chunks`** - List all chunks with metadata
 
 ### Multi-Project Organization

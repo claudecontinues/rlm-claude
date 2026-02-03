@@ -5,6 +5,22 @@ All notable changes to RLM are documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.3] - 2026-02-03
+
+### Added — Unified search across insights and chunks
+- `rlm_recall` now uses `tokenize_fr()` for multi-word tokenized search instead of exact substring matching
+  - `rlm_recall("SIRET auto-entrepreneur")` now finds insights containing any of those tokens (previously: 0 results)
+  - Results ranked by relevance (matching token ratio) then by date
+  - Stopword-only queries fall back to raw lowercase match
+- `rlm_search` BM25 index now includes insights from `session_memory.json` alongside chunks
+  - Results include `type` field: `"chunk"` or `"insight"` for disambiguation
+  - New `include_insights` parameter (default: `True`) to opt out of insight indexing
+
+### Backward compatibility
+- **100% backward compatible** — single-word queries behave identically (1 token = same substring match)
+- Empty/null queries still return all insights sorted by date
+- `rlm_search` without `include_insights` param defaults to `True` (no change for existing callers)
+
 ## [0.9.2] - 2026-02-02
 
 ### Fixed — Phase 8.1: Metadata-boosted search

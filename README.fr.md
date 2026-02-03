@@ -109,7 +109,7 @@ RLM s'accroche à l'événement `/compact` de Claude Code. Avant que votre conte
 
 ### Mémoire et Insights
 - **`rlm_remember`** - Sauvegarder des décisions, faits, préférences avec catégories et niveaux d'importance
-- **`rlm_recall`** - Rechercher des insights par mot-clé, catégorie ou importance
+- **`rlm_recall`** - Rechercher des insights par mot-clé (multi-mots tokenisés), catégorie ou importance
 - **`rlm_forget`** - Supprimer un insight
 - **`rlm_status`** - Vue d'ensemble du système (nombre d'insights, stats chunks, métriques d'accès)
 
@@ -117,7 +117,7 @@ RLM s'accroche à l'événement `/compact` de Claude Code. Avant que votre conte
 - **`rlm_chunk`** - Sauvegarder des segments de conversation en stockage persistant
 - **`rlm_peek`** - Lire un chunk (entier ou partiel par plage de lignes)
 - **`rlm_grep`** - Recherche regex dans tous les chunks (+ recherche floue pour tolérance aux typos)
-- **`rlm_search`** - Recherche hybride : BM25 + similarité cosinus sémantique (FR/EN, accents normalisés)
+- **`rlm_search`** - Recherche hybride : BM25 + similarité cosinus sémantique (FR/EN, accents normalisés, chunks + insights)
 - **`rlm_list_chunks`** - Lister tous les chunks avec métadonnées
 
 ### Organisation multi-projet
