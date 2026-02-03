@@ -11,6 +11,7 @@ import json
 from datetime import datetime
 
 from .fileutil import CONTEXT_DIR, atomic_write_json
+from .tokenizer_fr import tokenize_fr
 
 MEMORY_FILE = CONTEXT_DIR / "session_memory.json"
 
@@ -126,18 +127,38 @@ def recall(
     if importance:
         insights = [i for i in insights if i["importance"] == importance]
 
-    # Filter by query (search in content and tags)
+    # Filter by query (tokenized search in content and tags)
     if query:
-        query_lower = query.lower()
-        insights = [
-            i
-            for i in insights
-            if query_lower in i["content"].lower()
-            or any(query_lower in tag.lower() for tag in i.get("tags", []))
-        ]
+        query_tokens = tokenize_fr(query)
+
+        # Fallback: si tokenize_fr vide la query (que des stopwords), utiliser le raw
+        if not query_tokens:
+            query_tokens = [query.lower()]
+
+        scored_insights = []
+        for insight in insights:
+            content_lower = insight["content"].lower()
+            tags_lower = [tag.lower() for tag in insight.get("tags", [])]
+
+            # Compter les tokens qui matchent
+            matching = sum(
+                1 for token in query_tokens
+                if token in content_lower or any(token in tag for tag in tags_lower)
+            )
+
+            if matching > 0:
+                relevance = matching / len(query_tokens)
+                scored_insights.append((insight, relevance))
+
+        # Trier par relevance desc, puis date desc
+        scored_insights.sort(key=lambda x: (x[1], x[0]["created_at"]), reverse=True)
+        insights = [ins for ins, _ in scored_insights]
 
     # Sort by creation date (newest first) and limit
-    insights = sorted(insights, key=lambda x: x["created_at"], reverse=True)[:limit]
+    # (déjà trié par relevance si query, sinon tri par date)
+    if not query:
+        insights = sorted(insights, key=lambda x: x["created_at"], reverse=True)
+    insights = insights[:limit]
 
     return {
         "status": "success",

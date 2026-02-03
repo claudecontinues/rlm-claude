@@ -365,6 +365,7 @@ def rlm_search(
     date_from: str = "",
     date_to: str = "",
     entity: str = "",
+    include_insights: bool = True,
 ) -> str:
     """
     Search chunks using BM25 ranking (Phase 5.1).
@@ -386,6 +387,7 @@ def rlm_search(
         date_from: Start date inclusive, YYYY-MM-DD (e.g., "2026-01-25")
         date_to: End date inclusive, YYYY-MM-DD (e.g., "2026-01-30")
         entity: Filter by entity name (file, module, version, etc.)
+        include_insights: Include insights in search results (default: True)
 
     Returns:
         Ranked list of matching chunks with scores
@@ -398,6 +400,7 @@ def rlm_search(
         date_from=date_from if date_from else None,
         date_to=date_to if date_to else None,
         entity=entity if entity else None,
+        include_insights=include_insights,
     )
 
     if result["status"] == "error":
@@ -409,8 +412,9 @@ def rlm_search(
     output = [f"Top {result['result_count']} results for '{query}':\n"]
 
     for i, r in enumerate(result["results"], 1):
+        type_tag = f" ({r['type']})" if r.get("type") else ""
         output.append(
-            f"{i}. [{r['chunk_id']}] score: {r['score']:.2f}\n"
+            f"{i}. [{r['chunk_id']}]{type_tag} score: {r['score']:.2f}\n"
             f"   {r['summary'][:80]}{'...' if len(r['summary']) > 80 else ''}"
         )
 

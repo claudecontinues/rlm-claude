@@ -126,15 +126,19 @@ class RLMSearch:
             return match.group(1).strip()
         return ""
 
-    def build_index(self) -> int:
+    def build_index(self, include_insights: bool = True) -> int:
         """
-        Build BM25 index from all chunks.
+        Build BM25 index from all chunks and optionally insights.
 
         Reads all .md files in chunks directory, tokenizes content,
-        and builds the BM25 index.
+        and builds the BM25 index. When include_insights is True,
+        also indexes insights from session_memory.
+
+        Args:
+            include_insights: Whether to index insights too (default: True)
 
         Returns:
-            Number of chunks indexed
+            Number of documents indexed
         """
         if not BM25_AVAILABLE:
             raise ImportError("bm25s is required for search. Install with: pip install bm25s")
@@ -156,6 +160,23 @@ class RLMSearch:
                 self.chunk_ids.append(chunk_id)
                 self.chunk_summaries[chunk_id] = self._extract_summary(chunk_file)
 
+        # Index insights from session_memory
+        if include_insights:
+            from .memory import MEMORY_FILE, _load_memory
+
+            if MEMORY_FILE.exists():
+                memory = _load_memory()
+                for insight in memory.get("insights", []):
+                    content = insight["content"]
+                    if insight.get("tags"):
+                        content += " " + " ".join(insight["tags"])
+                    tokens = tokenize_fr(content)
+                    if tokens:
+                        documents.append(tokens)
+                        iid = f"insight:{insight['id']}"
+                        self.chunk_ids.append(iid)
+                        self.chunk_summaries[iid] = insight["content"][:80]
+
         if not documents:
             return 0
 
@@ -165,23 +186,24 @@ class RLMSearch:
 
         return len(documents)
 
-    def search(self, query: str, top_k: int = 5) -> list[dict]:
+    def search(self, query: str, top_k: int = 5, include_insights: bool = True) -> list[dict]:
         """
-        Search chunks using BM25 ranking.
+        Search chunks (and optionally insights) using BM25 ranking.
 
         Args:
             query: Natural language search query
             top_k: Maximum number of results to return
+            include_insights: Whether to include insights in search (default: True)
 
         Returns:
-            List of dicts with chunk_id, score, and summary
+            List of dicts with chunk_id, type, score, and summary
         """
         if not BM25_AVAILABLE:
             raise ImportError("bm25s is required for search. Install with: pip install bm25s")
 
         # Build index if not already done
         if self.retriever is None:
-            indexed = self.build_index()
+            indexed = self.build_index(include_insights=include_insights)
             if indexed == 0:
                 return []
 
@@ -200,9 +222,11 @@ class RLMSearch:
         for _i, (idx, score) in enumerate(zip(results[0], scores[0], strict=False)):
             if score > 0:  # Only include positive scores
                 chunk_id = self.chunk_ids[idx]
+                type_ = "insight" if chunk_id.startswith("insight:") else "chunk"
                 output.append(
                     {
                         "chunk_id": chunk_id,
+                        "type": type_,
                         "score": float(score),
                         "summary": self.chunk_summaries.get(chunk_id, ""),
                     }
@@ -285,6 +309,7 @@ def search(
     date_from: str = None,
     date_to: str = None,
     entity: str = None,
+    include_insights: bool = True,
 ) -> dict:
     """
     Convenience function for searching chunks.
@@ -311,7 +336,7 @@ def search(
 
     try:
         # Get more results than needed for filtering
-        results = searcher.search(query, top_k=limit * 3)
+        results = searcher.search(query, top_k=limit * 3, include_insights=include_insights)
     except ImportError as e:
         return {"status": "error", "message": str(e), "results": []}
 
