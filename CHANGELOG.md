@@ -5,7 +5,11 @@ All notable changes to RLM are documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.10.0] - 2026-02-03
+## [Unreleased]
+
+_Nothing yet._
+
+## [0.10.0] - 2026-02-04
 
 ### Added — Phase 9: Chunking Typé
 - New `chunk_type` parameter in `rlm_chunk()` to categorize chunks at creation time
@@ -16,8 +20,44 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - Validation: invalid `chunk_type` returns explicit error with valid types list
 - `chunk_type` stored in YAML frontmatter header and `index.json` metadata
 - Updated `rlm-chunk-triggers.md` with types documentation, examples, and anti-patterns
+- 9 unit tests in `tests/test_chunk_type.py`
 
-### Why
+### Added — Phase 7.2: Entity Extraction
+- `_extract_entities(content)` — regex-based extraction of files, versions, modules, tickets, functions
+- `_entity_matches(chunk_info, entity)` — case-insensitive substring matching across all entity types
+- `entity` param on `rlm_grep` — filter grep/fuzzy results by entity
+- `entity` param on `rlm_search` — filter BM25 results by entity
+- Auto-extraction at `rlm_chunk()` time — entities stored in index.json and YAML frontmatter
+- Typed storage: `{"files": [...], "versions": [...], "modules": [...], "tickets": [...], "functions": [...]}`
+- 36 tests in `tests/test_entity_extraction.py`
+- Zero external dependencies (regex-only, MAGMA-inspired lightweight approach)
+
+### Added — Phase 7.1: Temporal Filtering
+- `date_from`/`date_to` params on `rlm_search` — filter BM25 results by date range
+- `date_from`/`date_to` params on `rlm_grep` — filter regex/fuzzy results by date range
+- `_parse_date_from_chunk()` helper — extracts date from `created_at` or chunk ID fallback
+- `_chunk_in_date_range()` helper — lexicographic YYYY-MM-DD comparison (no datetime parsing)
+- 28 tests in `tests/test_temporal_filter.py`
+- Backward compatible: legacy format 1.0 chunks supported via ID-based date extraction
+
+### Added — Phase 6: Security Hardening
+- `mcp_server/tools/fileutil.py` — Shared security utilities (atomic writes, path traversal prevention, file locking)
+- `SECURITY.md` — Vulnerability reporting policy
+- GitHub Actions CI: ruff lint + ruff format
+- `tests/` directory with pytest infrastructure
+
+### Security (Phase 6)
+- **Path traversal prevention** — Chunk IDs validated against strict allowlist `[a-zA-Z0-9_.-&]`, resolved paths checked
+- **Atomic writes** — All JSON and chunk files written via write-to-temp-then-rename (POSIX atomic)
+- **File locking** — `fcntl.flock` exclusive locks for concurrent read-modify-write on shared indexes
+- **Content size limits** — 2 MB chunks, 10 MB decompression cap (gzip bomb protection)
+- **SHA-256 hashing** — Content deduplication uses SHA-256 (not MD5)
+
+### Changed
+- Duplicate detection upgraded from MD5 to SHA-256
+- All I/O operations consolidated into `fileutil.py`
+
+### Why (Phase 9)
 - Chunks mixed permanent insights ("WeasyPrint CSS must be inline") with temporal snapshots ("catalogue has 8 pages")
 - When topics evolve, old chunks become partially obsolete with no mechanism to manage this
 - `chunk_type` forces separation at the source: permanent facts go to `rlm_remember()`, temporal state goes to typed chunks
@@ -25,6 +65,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Backward compatibility
 - **100% backward compatible** — default `chunk_type` is `session`
 - Existing 128+ chunks without `chunk_type` continue to work (treated as `session`)
+- Existing chunks without entities treated as `{}`
 - No migration needed
 
 ## [0.9.3] - 2026-02-03
@@ -112,47 +153,6 @@ pip install mcp-rlm-server[all]
 # Upgrade from v0.9.0 (git users)
 cd rlm-claude && git pull && ./install.sh
 ```
-
-## [Unreleased]
-
-### Added — Phase 7.2: Entity Extraction (COMPLETE)
-- `_extract_entities(content)` — regex-based extraction of files, versions, modules, tickets, functions
-- `_entity_matches(chunk_info, entity)` — case-insensitive substring matching across all entity types
-- `entity` param on `rlm_grep` — filter grep/fuzzy results by entity
-- `entity` param on `rlm_search` — filter BM25 results by entity
-- Auto-extraction at `rlm_chunk()` time — entities stored in index.json and YAML frontmatter
-- Typed storage: `{"files": [...], "versions": [...], "modules": [...], "tickets": [...], "functions": [...]}`
-- 36 tests in `tests/test_entity_extraction.py` (extraction, matching, grep filter, search filter)
-- Zero external dependencies (regex-only, MAGMA-inspired lightweight approach)
-- Backward compatible: existing chunks without entities treated as `{}`
-
-### Added — Phase 7.1: Temporal Filtering (COMPLETE)
-- `date_from`/`date_to` params on `rlm_search` — filter BM25 results by date range
-- `date_from`/`date_to` params on `rlm_grep` — filter regex/fuzzy results by date range
-- `_parse_date_from_chunk()` helper — extracts date from `created_at` or chunk ID fallback
-- `_chunk_in_date_range()` helper — lexicographic YYYY-MM-DD comparison (no datetime parsing)
-- 28 tests in `tests/test_temporal_filter.py` (helpers, grep, fuzzy+date, search, legacy, edge cases)
-- Backward compatible: legacy format 1.0 chunks supported via ID-based date extraction
-
-### Added — Phase 6: Production-Ready (in progress)
-- `mcp_server/tools/fileutil.py` - Shared security utilities (atomic writes, path traversal prevention, file locking)
-- `SECURITY.md` - Vulnerability reporting policy
-- GitHub Actions CI: ruff lint + ruff format
-- `tests/` directory with pytest infrastructure
-
-### Security (Phase 6)
-- **Path traversal prevention** — Chunk IDs validated against strict allowlist `[a-zA-Z0-9_.-&]`, resolved paths checked
-- **Atomic writes** — All JSON and chunk files written via write-to-temp-then-rename (POSIX atomic)
-- **File locking** — `fcntl.flock` exclusive locks for concurrent read-modify-write on shared indexes
-- **Content size limits** — 2 MB chunks, 10 MB decompression cap (gzip bomb protection)
-- **SHA-256 hashing** — Content deduplication uses SHA-256 (not MD5)
-
-### Changed
-- Duplicate detection upgraded from MD5 to SHA-256
-- All I/O operations consolidated into `fileutil.py`
-- Import ordering fixed for ruff compliance
-
----
 
 ## [0.9.0] - 2026-01-24 - Système Simplifié (User-Driven + Auto-Compact)
 
