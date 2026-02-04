@@ -5,6 +5,28 @@ All notable changes to RLM are documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0] - 2026-02-03
+
+### Added — Phase 9: Chunking Typé
+- New `chunk_type` parameter in `rlm_chunk()` to categorize chunks at creation time
+  - `snapshot` — Current state of a topic (will be replaced by next snapshot)
+  - `session` — Work session log (default, backward compatible)
+  - `debug` — Bug + fix for future reference
+  - `insight` — Redirects to `rlm_remember()` with helpful message
+- Validation: invalid `chunk_type` returns explicit error with valid types list
+- `chunk_type` stored in YAML frontmatter header and `index.json` metadata
+- Updated `rlm-chunk-triggers.md` with types documentation, examples, and anti-patterns
+
+### Why
+- Chunks mixed permanent insights ("WeasyPrint CSS must be inline") with temporal snapshots ("catalogue has 8 pages")
+- When topics evolve, old chunks become partially obsolete with no mechanism to manage this
+- `chunk_type` forces separation at the source: permanent facts go to `rlm_remember()`, temporal state goes to typed chunks
+
+### Backward compatibility
+- **100% backward compatible** — default `chunk_type` is `session`
+- Existing 128+ chunks without `chunk_type` continue to work (treated as `session`)
+- No migration needed
+
 ## [0.9.3] - 2026-02-03
 
 ### Added — Unified search across insights and chunks

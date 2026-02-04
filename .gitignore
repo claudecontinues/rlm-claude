@@ -26,6 +26,7 @@ context/session_memory.json
 context/index.json
 context/domains.json
 context/sessions.json
+context/embeddings.npz
 logs/
 *.log
 

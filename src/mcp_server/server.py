@@ -197,6 +197,7 @@ def rlm_chunk(
     project: str = "",
     ticket: str = "",
     domain: str = "",
+    chunk_type: str = "session",
 ) -> str:
     """
     Save content to an external chunk file for later retrieval.
@@ -214,6 +215,11 @@ def rlm_chunk(
     - Supports project/ticket/domain for multi-session organization
     - New chunk ID format: {date}_{project}_{seq}[_{ticket}][_{domain}]
 
+    Phase 9 enhancements:
+    - chunk_type categorization to separate temporal snapshots from permanent insights
+    - Types: "snapshot" (current state, will be replaced), "session" (work log),
+      "debug" (bug + fix reference). Use "insight" to be redirected to rlm_remember().
+
     Args:
         content: The text content to save as a chunk (conversation history, notes, etc.)
         summary: Brief description of what this chunk contains (auto-generated if empty)
@@ -221,6 +227,9 @@ def rlm_chunk(
         project: Project name (auto-detected from git if empty)
         ticket: Optional ticket reference (e.g., "JJ-123", "GH-456")
         domain: Optional domain (e.g., "bp", "seo", "r&d", "website")
+        chunk_type: Type of chunk - "snapshot" (current state of a topic, will become obsolete),
+                    "session" (work log, default), "debug" (bug + fix for future reference).
+                    Use "insight" to be redirected to rlm_remember() for permanent facts.
 
     Returns:
         Confirmation with chunk ID and token estimate
@@ -233,7 +242,12 @@ def rlm_chunk(
         project=project if project else None,
         ticket=ticket if ticket else None,
         domain=domain if domain else None,
+        chunk_type=chunk_type,
     )
+
+    # Phase 9: Handle insight redirect
+    if result["status"] == "redirect":
+        return f"↗ {result['message']}"
 
     # Phase 4.2: Handle duplicate detection
     if result["status"] == "duplicate":
@@ -243,8 +257,12 @@ def rlm_chunk(
             f"  Summary: {result['existing_summary']}"
         )
 
-    # Include auto-generated summary in response
-    return f"✓ {result['message']}\n  Summary: {result.get('summary', 'N/A')}"
+    # Phase 9: Handle validation error
+    if result["status"] == "error":
+        return f"✗ {result['message']}"
+
+    # Include auto-generated summary and chunk_type in response
+    return f"✓ {result['message']}\n  Type: {chunk_type}\n  Summary: {result.get('summary', 'N/A')}"
 
 
 @mcp.tool()

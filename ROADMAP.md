@@ -1,7 +1,7 @@
 # RLM - Roadmap
 
 > Pistes futures pour RLM - Memoire infinie pour Claude Code
-> **Derniere MAJ** : 2026-02-02 (v0.9.2 - Hybrid Semantic Search)
+> **Derniere MAJ** : 2026-02-03 (v0.10.0 - Chunking Typé)
 
 ---
 
@@ -17,6 +17,7 @@
 | **Phase 6** | VALIDÉE | Production-Ready (tests, CI/CD, PyPI) |
 | **Phase 7** | VALIDÉE | MAGMA-Inspired (filtre temporel + extraction entités) |
 | **Phase 8** | VALIDÉE | Hybrid Semantic Search (BM25 + cosine, model2vec) |
+| **Phase 9** | VALIDÉE | Chunking Typé (chunk_type: snapshot/session/debug) |
 
 ---
 
@@ -1301,6 +1302,48 @@ python3 scripts/backfill_embeddings.py   # retroactif
 | 18 tests (sans model2vec requis) | FAIT |
 | `pyproject.toml` optional deps | FAIT |
 | Backfill 106 chunks existants | FAIT |
+
+---
+
+## Phase 9 : Chunking Typé - FAIT (v0.10.0)
+
+**Objectif** : Forcer la séparation entre infos permanentes et snapshots temporels pour résoudre l'obsolescence des chunks.
+
+**Problème résolu** : Les chunks mélangeaient insights permanents ("WeasyPrint CSS inline") et snapshots temporels ("catalogue fait 8 pages"). Quand le sujet évolue, les vieux chunks deviennent partiellement obsolètes sans mécanisme de gestion.
+
+**Implémenté le 2026-02-03** :
+
+### chunk_type parameter
+
+| Type | Usage | Durée de vie |
+|------|-------|-------------|
+| `snapshot` | État d'un sujet à l'instant T | Courte (remplacé par le suivant) |
+| `session` | Log de session de travail (défaut) | Moyenne (historique) |
+| `debug` | Bug + solution | Longue (référence) |
+| `insight` | **Redirigé** → `rlm_remember()` | — |
+
+- Paramètre `chunk_type` ajouté à `chunk()` et `rlm_chunk()`
+- Validation stricte (type invalide → erreur)
+- Redirect intelligent (insight → rlm_remember)
+- Stocké dans YAML frontmatter + index.json
+- Défaut `session` pour rétrocompatibilité
+
+### Fichiers modifiés
+
+| Fichier | Changement |
+|---------|-----------|
+| `src/mcp_server/tools/navigation.py` | `chunk_type` param + validation + YAML + index |
+| `src/mcp_server/server.py` | `chunk_type` param MCP + redirect/error handling |
+| `.claude/rules/rlm-chunk-triggers.md` | Documentation types + exemples + anti-patterns |
+
+### R&D associée (hors scope Phase 9)
+
+Discussion du 03/02/2026 sur l'obsolescence des chunks — 5 pistes explorées :
+1. **Pre-chunk search** : auto-search avant création (prochaine priorité)
+2. **Champ `reference`** : lien vers source externe (track, doc)
+3. **Track-aware RLM** : intégration tracks comme concept RLM
+4. **Supersession** : abandonnée (trop binaire pour chunks multi-sujets)
+5. **Audit on-compact** : non retenue (usine à gaz)
 
 ---
 

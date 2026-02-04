@@ -509,6 +509,9 @@ def _generate_chunk_id(project: str = None, ticket: str = None, domain: str = No
     return "_".join(parts)
 
 
+VALID_CHUNK_TYPES = ("snapshot", "session", "debug")
+
+
 def chunk(
     content: str,
     summary: str = "",
@@ -516,6 +519,7 @@ def chunk(
     project: str = None,
     ticket: str = None,
     domain: str = None,
+    chunk_type: str = "session",
 ) -> dict:
     """
     Save content to an external chunk file.
@@ -532,6 +536,10 @@ def chunk(
     - Supports project/ticket/domain for multi-session organization
     - New chunk ID format: {date}_{project}_{seq}[_{ticket}][_{domain}]
 
+    Phase 9 enhancements:
+    - chunk_type categorization (snapshot, session, debug)
+    - Redirects "insight" type to rlm_remember()
+
     Args:
         content: The text content to save as a chunk
         summary: Brief description of what this chunk contains (auto-generated if empty)
@@ -539,10 +547,33 @@ def chunk(
         project: Project name (auto-detected if None)
         ticket: Optional ticket reference (e.g., "JJ-123")
         domain: Optional domain (e.g., "bp", "seo", "r&d")
+        chunk_type: Type of chunk - "snapshot" (current state of a topic),
+                    "session" (work log), or "debug" (bug + fix).
+                    Use "insight" to be redirected to rlm_remember().
 
     Returns:
-        Dictionary with chunk_id and confirmation, or duplicate status
+        Dictionary with chunk_id and confirmation, or duplicate/redirect status
     """
+    # Phase 9: chunk_type validation
+    if chunk_type == "insight":
+        return {
+            "status": "redirect",
+            "message": (
+                "For permanent insights, use rlm_remember() instead of rlm_chunk().\n"
+                "rlm_remember() stores searchable facts that won't become obsolete.\n"
+                "rlm_chunk() is for temporal snapshots and session logs."
+            ),
+        }
+
+    if chunk_type not in VALID_CHUNK_TYPES:
+        return {
+            "status": "error",
+            "message": (
+                f"Invalid chunk_type '{chunk_type}'. "
+                f"Valid types: {', '.join(VALID_CHUNK_TYPES)}, insight (redirects to rlm_remember)."
+            ),
+        }
+
     CHUNKS_DIR.mkdir(parents=True, exist_ok=True)
 
     # Phase 6: Content size limit
@@ -591,6 +622,7 @@ def chunk(
 id: {chunk_id}
 summary: {summary}
 tags: {", ".join(tags or [])}
+chunk_type: {chunk_type}
 entities:
 {entities_yaml}
 project: {resolved_project}
@@ -619,6 +651,8 @@ format_version: "2.0"
             "access_count": 0,
             "last_accessed": None,
             "created_at": datetime.now().isoformat(),
+            # Phase 9 fields
+            "chunk_type": chunk_type,
             # Phase 5.5 fields
             "project": resolved_project,
             "ticket": ticket,
