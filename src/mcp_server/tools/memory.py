@@ -169,6 +169,94 @@ def recall(
     }
 
 
+def update(
+    insight_id: str,
+    content: str | None = None,
+    category: str | None = None,
+    importance: str | None = None,
+    tags: str | None = None,
+    add_tags: str | None = None,
+    remove_tags: str | None = None,
+) -> dict:
+    """
+    Update an existing insight in memory.
+
+    Allows modifying any field of an insight without deleting and recreating it.
+    Preserves the original creation date and ID.
+
+    Args:
+        insight_id: The ID of the insight to update (8-character hex)
+        content: New content text (if changing)
+        category: New category (decision, fact, preference, finding, todo, experience)
+        importance: New importance (low, medium, high, critical)
+        tags: Comma-separated tags to REPLACE existing tags entirely
+        add_tags: Comma-separated tags to ADD to existing tags
+        remove_tags: Comma-separated tags to REMOVE from existing tags
+
+    Returns:
+        Confirmation with updated insight details
+    """
+    memory = _load_memory()
+
+    # Find the insight
+    target = None
+    for insight in memory["insights"]:
+        if insight["id"] == insight_id:
+            target = insight
+            break
+
+    if target is None:
+        return {"status": "not_found", "message": f"No insight found with ID {insight_id}"}
+
+    # Track what changed
+    changes = []
+
+    if content is not None:
+        target["content"] = content
+        changes.append("content")
+
+    if category is not None:
+        target["category"] = category
+        changes.append("category")
+
+    if importance is not None:
+        target["importance"] = importance
+        changes.append("importance")
+
+    # Handle tag operations
+    if tags is not None:
+        # Replace all tags
+        target["tags"] = [t.strip() for t in tags.split(",") if t.strip()]
+        changes.append("tags (replaced)")
+    else:
+        current_tags = set(target.get("tags", []))
+        if add_tags is not None:
+            new_tags = {t.strip() for t in add_tags.split(",") if t.strip()}
+            current_tags |= new_tags
+            changes.append(f"tags (+{', '.join(new_tags)})")
+        if remove_tags is not None:
+            del_tags = {t.strip() for t in remove_tags.split(",") if t.strip()}
+            current_tags -= del_tags
+            changes.append(f"tags (-{', '.join(del_tags)})")
+        if add_tags is not None or remove_tags is not None:
+            target["tags"] = sorted(current_tags)
+
+    # Add updated_at timestamp
+    target["updated_at"] = datetime.now().isoformat()
+
+    if not changes:
+        return {"status": "no_change", "message": "No fields were modified"}
+
+    _save_memory(memory)
+
+    return {
+        "status": "updated",
+        "id": insight_id,
+        "changes": changes,
+        "message": f"Insight {insight_id} updated: {', '.join(changes)}",
+    }
+
+
 def forget(insight_id: str) -> dict:
     """
     Remove an insight from memory.

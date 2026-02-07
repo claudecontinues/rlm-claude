@@ -16,7 +16,7 @@ Usage:
 
 from mcp.server.fastmcp import FastMCP
 
-from mcp_server.tools.memory import forget, memory_status, recall, remember
+from mcp_server.tools.memory import forget, memory_status, recall, remember, update
 from mcp_server.tools.navigation import chunk, grep, list_chunks, peek
 from mcp_server.tools.retention import restore, retention_preview, retention_run
 from mcp_server.tools.search import search as bm25_search
@@ -93,6 +93,50 @@ def rlm_recall(query: str = "", category: str = "", importance: str = "", limit:
         )
 
     return "\n\n".join(output_lines)
+
+
+@mcp.tool()
+def rlm_update(
+    insight_id: str,
+    content: str = "",
+    category: str = "",
+    importance: str = "",
+    tags: str = "",
+    add_tags: str = "",
+    remove_tags: str = "",
+) -> str:
+    """
+    Update an existing insight in memory.
+
+    Modify any field without deleting and recreating. Preserves creation date and ID.
+
+    Args:
+        insight_id: The ID of the insight to update (8-character hex)
+        content: New content text (leave empty to keep current)
+        category: New category (leave empty to keep current)
+        importance: New importance level (leave empty to keep current)
+        tags: Comma-separated tags to REPLACE all existing tags (leave empty to keep)
+        add_tags: Comma-separated tags to ADD to existing tags
+        remove_tags: Comma-separated tags to REMOVE from existing tags
+
+    Returns:
+        Confirmation with changes made
+    """
+    result = update(
+        insight_id,
+        content=content if content else None,
+        category=category if category else None,
+        importance=importance if importance else None,
+        tags=tags if tags else None,
+        add_tags=add_tags if add_tags else None,
+        remove_tags=remove_tags if remove_tags else None,
+    )
+
+    if result["status"] == "not_found":
+        return f"✗ {result['message']}"
+    if result["status"] == "no_change":
+        return f"⚠ {result['message']}"
+    return f"✓ {result['message']}"
 
 
 @mcp.tool()
